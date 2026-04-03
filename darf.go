@@ -2,7 +2,14 @@ package bbapi
 
 import (
 	"context"
+	"fmt"
 	"net/url"
+)
+
+const (
+	endpointDARFBatch        = "/lotes-darf-normal-preto"
+	endpointDARFBatchRequest = "/lotes-darf-preto-normal/%s/solicitacao" // NOTE: word order differs from endpointDARFBatch — this is intentional per BB API docs.
+	endpointDARFPayment      = "/darf-preto/%s"
 )
 
 // DARFEntry represents a DARF payment entry.
@@ -150,7 +157,7 @@ func (c *Client) CreateDARFBatch(
 	ctx context.Context,
 	req *CreateDARFBatchRequest,
 ) (*CreateDARFBatchResponse, error) {
-	return post[*CreateDARFBatchResponse](c, ctx, "/lotes-darf-normal-preto", req)
+	return post[*CreateDARFBatchResponse](c, ctx, endpointDARFBatch, req)
 }
 
 // GetDARFBatchRequest returns the request-stage representation of a DARF batch.
@@ -161,7 +168,10 @@ func (c *Client) GetDARFBatchRequest(
 ) (*GetDARFBatchRequestResponse, error) {
 	query := url.Values{}
 	setAccountLookupQuery(query, params, "numeroAgenciaDebito", "numeroContaCorrenteDebito", "digitoVerificadorContaCorrenteDebito")
-	return get[*GetDARFBatchRequestResponse](c, ctx, buildPath("/lotes-darf-preto-normal/"+id+"/solicitacao", query))
+	return get[*GetDARFBatchRequestResponse](
+		c, ctx,
+		buildPath(fmt.Sprintf(endpointDARFBatchRequest, id), query),
+	)
 }
 
 // GetDARFPayment returns a single DARF payment.
@@ -172,5 +182,8 @@ func (c *Client) GetDARFPayment(
 ) (*GetDARFPaymentResponse, error) {
 	query := url.Values{}
 	setAccountLookupQuery(query, params, "agencia", "contaCorrente", "digitoVerificador")
-	return get[*GetDARFPaymentResponse](c, ctx, buildPath("/darf-preto/"+id, query))
+	return get[*GetDARFPaymentResponse](
+		c, ctx,
+		buildPath(fmt.Sprintf(endpointDARFPayment, id), query),
+	)
 }
