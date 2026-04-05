@@ -4,9 +4,9 @@
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue)](https://golang.org/dl/)
 [![Go Report Card](https://goreportcard.com/badge/github.com/raykavin/bbapi-go)](https://goreportcard.com/report/github.com/raykavin/bbapi-go)
 
-A Go library for the **Banco do Brasil Batch Payments API** (`Pagamentos em Lote`).
+A Go library for **Banco do Brasil APIs**.
 
-Covers all documented resources from the OpenAPI file in this repository: Payment Management, Transfers, Pix Transfers, Bank Slips, Barcode Guides, DARF, GPS, and GRU.
+The project is structured to support multiple Banco do Brasil API resources over time.
 
 ---
 
@@ -101,6 +101,8 @@ client, err := bbapi.NewClient(bbapi.Config{
 ```
 
 ### Default URLs
+
+The default API URLs below point to the API currently implemented by this version of the SDK:
 
 - Sandbox API: `https://homologa-api-ip.bb.com.br:7144/pagamentos-lote/v1`
 - Production API: `https://api-ip.bb.com.br/pagamentos-lote/v1`
@@ -198,9 +200,9 @@ See [doc.go](/workspaces/app/doc.go) for the full list.
 
 ---
 
-## Implemented API Coverage
+## Implemented Coverage
 
-The OpenAPI file in this repository defines **30 unique HTTP operations**, and this SDK implements all **30**.
+The API specification currently bundled with this repository defines **30 unique HTTP operations**, and this SDK implements all **30**.
 
 ### Payment Management
 
