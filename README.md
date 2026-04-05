@@ -1,18 +1,14 @@
-# bbapi-go
+# Unofficial Banco do Brasil API
 
-`bbapi-go` is a Go SDK for Banco do Brasil's Batch Payments API (`Pagamentos em Lote`).
+[![Go Reference](https://pkg.go.dev/badge/github.com/raykavin/bbapi-go.svg)](https://pkg.go.dev/github.com/raykavin/bbapi-go)
+[![Go Version](https://img.shields.io/badge/go-1.25+-blue)](https://golang.org/dl/)
+[![Go Report Card](https://goreportcard.com/badge/github.com/raykavin/bbapi-go)](https://goreportcard.com/report/github.com/raykavin/bbapi-go)
 
-This repository currently focuses on the API described in `OpenAPI_BB_Pagamentos em Lote_v1.json`, while keeping the package layout ready for future Banco do Brasil APIs.
+A Go library for the **Banco do Brasil Batch Payments API** (`Pagamentos em Lote`).
 
-## Features
+Covers all documented resources from the OpenAPI file in this repository: Payment Management, Transfers, Pix Transfers, Bank Slips, Barcode Guides, DARF, GPS, and GRU.
 
-- Idiomatic Go client API
-- English code identifiers with JSON tags mapped to Banco do Brasil field names
-- OAuth2 `client_credentials` authentication
-- Automatic token reuse and refresh
-- Retry support for transient HTTP failures
-- Typed request and response models
-- Unit tests for request building, model serialization, response parsing, and error handling
+---
 
 ## Installation
 
@@ -20,14 +16,11 @@ This repository currently focuses on the API described in `OpenAPI_BB_Pagamentos
 go get github.com/raykavin/bbapi-go
 ```
 
-## Requirements
+Requires **Go 1.25+**.
 
-You will need Banco do Brasil API credentials and configuration:
+The SDK uses `github.com/raykavin/gokit/http` for HTTP requests and includes retry support for transient failures.
 
-- `client_id`
-- `client_secret`
-- `app_key`
-- OAuth scopes for the endpoints you want to call
+---
 
 ## Quick Start
 
@@ -58,6 +51,12 @@ func main() {
 
 	ctx := context.Background()
 
+	tokenResp, err := client.Authenticate(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	client.SetTokenResponse(tokenResp)
+
 	resp, err := client.CreateTransferBatch(ctx, &bbapi.CreateTransferBatchRequest{
 		RequestNumber: 123,
 		PaymentType:   bbapi.PaymentTypeMiscellaneous,
@@ -72,29 +71,34 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Printf("state=%d transfers=%d", resp.RequestState, resp.TransferCount)
+	log.Printf("request_state=%d transfer_count=%d", resp.RequestState, resp.TransferCount)
 }
 ```
 
+---
+
 ## Configuration
 
-The client is configured through `bbapi.Config`.
+```go
+client, err := bbapi.NewClient(bbapi.Config{
+	// Required
+	ClientID:     "your-client-id",
+	ClientSecret: "your-client-secret",
+	AppKey:       "your-app-key",
 
-| Field | Description |
-|---|---|
-| `ClientID` | Banco do Brasil application client ID |
-| `ClientSecret` | Banco do Brasil application client secret |
-| `AppKey` | Application key sent to the API |
-| `Sandbox` | Uses BB sandbox URLs when `true` |
-| `APIURL` | Optional API base URL override |
-| `AuthURL` | Optional OAuth token URL override |
-| `AccessToken` | Optional initial token |
-| `Scopes` | OAuth scopes requested during authentication |
-| `HTTPClient` | Optional custom `*http.Client` |
-| `Timeout` | HTTP timeout |
-| `MaxRetries` | Retry count for transient failures |
-| `RetryWaitMin` | Minimum retry backoff |
-| `RetryWaitMax` | Maximum retry backoff |
+	// Optional defaults shown
+	Sandbox:      true,
+	APIURL:       "",
+	AuthURL:      "",
+	AccessToken:  "",
+	Scopes:       []bbapi.Scope{},
+	HTTPClient:   &http.Client{},
+	Timeout:      30 * time.Second,
+	MaxRetries:   3,
+	RetryWaitMin: 1 * time.Second,
+	RetryWaitMax: 10 * time.Second,
+})
+```
 
 ### Default URLs
 
@@ -103,28 +107,73 @@ The client is configured through `bbapi.Config`.
 - Sandbox OAuth: `https://oauth.sandbox.bb.com.br/oauth/token`
 - Production OAuth: `https://oauth.bb.com.br/oauth/token`
 
+### Config fields
+
+| Field | Description |
+|---|---|
+| `ClientID` | Banco do Brasil application client ID |
+| `ClientSecret` | Banco do Brasil application client secret |
+| `AppKey` | Application key required by the API |
+| `Sandbox` | Switches the client to BB sandbox endpoints |
+| `APIURL` | Optional API base URL override |
+| `AuthURL` | Optional OAuth token URL override |
+| `AccessToken` | Optional preloaded access token |
+| `Scopes` | OAuth scopes requested during authentication |
+| `HTTPClient` | Optional custom `*http.Client` |
+| `Timeout` | Request timeout |
+| `MaxRetries` | Retry attempts for transient failures |
+| `RetryWaitMin` | Minimum retry backoff |
+| `RetryWaitMax` | Maximum retry backoff |
+
+---
+
 ## Authentication
 
 The SDK supports OAuth2 using the `client_credentials` flow.
 
-You can authenticate explicitly:
+### Authenticate with configured credentials
 
 ```go
-token, err := client.Authenticate(ctx)
+tokenResp, err := client.Authenticate(ctx)
 if err != nil {
 	log.Fatal(err)
 }
-
-log.Println(token.AccessToken)
+client.SetTokenResponse(tokenResp)
 ```
 
-Or set a token manually:
+### Authenticate with explicit credentials
+
+```go
+tokenResp, err := client.AuthenticateClientCredentials(ctx, bbapi.ClientCredentialsRequest{
+	ClientID:     "your-client-id",
+	ClientSecret: "your-client-secret",
+	Scope:        "pagamentos-lote.transferencias-requisicao pagamentos-lote.lotes-requisicao",
+})
+if err != nil {
+	log.Fatal(err)
+}
+client.SetTokenResponse(tokenResp)
+```
+
+### Set a token manually
 
 ```go
 client.SetAccessToken("your-access-token")
 ```
 
+### Token lifecycle
+
+```go
+token := client.GetAccessToken()
+expiresAt := client.TokenExpiresAt()
+
+_ = token
+_ = expiresAt
+```
+
 If no valid token is cached, the client authenticates automatically before calling the API.
+
+---
 
 ## OAuth Scopes
 
@@ -145,11 +194,13 @@ The package exposes typed scope constants, including:
 - `bbapi.ScopeReturnedPaymentsInfo`
 - `bbapi.ScopeCancelRequest`
 
-See `doc.go` for the full scope list.
+See [doc.go](/workspaces/app/doc.go) for the full list.
+
+---
 
 ## Implemented API Coverage
 
-The OpenAPI file in this repository contains 30 unique HTTP operations, and this SDK implements all 30 of them.
+The OpenAPI file in this repository defines **30 unique HTTP operations**, and this SDK implements all **30**.
 
 ### Payment Management
 
@@ -205,7 +256,7 @@ The OpenAPI file in this repository contains 30 unique HTTP operations, and this
 - `GetGRUBatchRequest`
 - `GetGRUPayment`
 
-## Implemented Resource Prefixes
+### Implemented resource prefixes
 
 - `/pagamentos`
 - `/liberar-pagamentos`
@@ -231,15 +282,17 @@ The OpenAPI file in this repository contains 30 unique HTTP operations, and this
 - `/gru`
 - `/{id}`
 
+---
+
 ## Useful Constants
 
-### Payment Types
+### Payment types
 
 - `bbapi.PaymentTypeSuppliers`
 - `bbapi.PaymentTypeSalary`
 - `bbapi.PaymentTypeMiscellaneous`
 
-### Request States
+### Request states
 
 - `bbapi.PaymentRequestStateConsistent`
 - `bbapi.PaymentRequestStateInconsistent`
@@ -252,9 +305,11 @@ The OpenAPI file in this repository contains 30 unique HTTP operations, and this
 - `bbapi.PaymentRequestStateReleasedByAPI`
 - `bbapi.PaymentRequestStatePreparingReleased`
 
+---
+
 ## Error Handling
 
-Errors returned by the API and OAuth server are normalized into `*bbapi.APIError`.
+Errors returned by Banco do Brasil's API and OAuth server are normalized into `*bbapi.APIError`.
 
 ```go
 resp, err := client.GetGRUPayment(ctx, "123", nil)
@@ -277,6 +332,8 @@ Helper functions are available for common checks:
 - `bbapi.IsRateLimited(err)`
 - `bbapi.IsServerError(err)`
 
+---
+
 ## Retry Behavior
 
 The client retries transient failures, including:
@@ -289,6 +346,8 @@ The client retries transient failures, including:
 
 The client also clears the cached token and re-authenticates after a `401 Unauthorized` response when appropriate.
 
+---
+
 ## Testing
 
 Run the test suite with:
@@ -297,18 +356,20 @@ Run the test suite with:
 go test ./...
 ```
 
-The current tests cover:
+Current tests cover:
 
 - request construction
 - model serialization and deserialization
 - response parsing
 - error handling
 
+---
+
 ## Project Layout
 
 | File | Responsibility |
 |---|---|
-| `client.go` | Core client, request flow, token reuse, retry integration |
+| `client.go` | Core client, token reuse, request execution, retry integration |
 | `config.go` | SDK configuration and defaults |
 | `auth.go` | OAuth authentication |
 | `errors.go` | API error parsing and helpers |
@@ -321,8 +382,10 @@ The current tests cover:
 | `gps.go` | GPS endpoints |
 | `gru.go` | GRU endpoints |
 
+---
+
 ## Notes
 
 - All Go identifiers are intentionally written in English.
 - Banco do Brasil JSON field names remain mapped through `json` tags.
-- The codebase is organized so new Banco do Brasil APIs can be added later without reshaping the current client design.
+- The codebase is organized so new Banco do Brasil APIs can be added later without changing the current client structure.
