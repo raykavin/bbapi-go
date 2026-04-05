@@ -8,7 +8,7 @@ import (
 
 const (
 	endpointDARFBatch        = "/lotes-darf-normal-preto"
-	endpointDARFBatchRequest = "/lotes-darf-preto-normal/%s/solicitacao" // NOTE: word order differs from endpointDARFBatch — this is intentional per BB API docs.
+	endpointDARFBatchRequest = "/lotes-darf-preto-normal/%s/solicitacao"
 	endpointDARFPayment      = "/darf-preto/%s"
 )
 
