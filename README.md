@@ -635,7 +635,7 @@ Contributions to bbapi-go are welcome! Here are some ways you can help improve t
 
 ## License
 bbapi-go is distributed under the **MIT License**.  
-For complete license terms and conditions, see the [LICENSE](LICENSE.md) file in the repository.
+For complete license terms and conditions, see the [LICENSE](LICENSE) file in the repository.
 
 ---
 
