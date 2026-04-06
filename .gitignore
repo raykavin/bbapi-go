@@ -30,6 +30,7 @@ go.work.sum
 *.code-workspace
 *.swp
 *.swo
+*.json
 *~
 
 # OS artifacts
