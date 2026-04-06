@@ -8,7 +8,7 @@ import (
 
 const (
 	endpointGRUBatch        = "/pagamentos-gru"
-	endpointGRUBatchRequest = "/lotes-gru/%s/solicitacao" // NOTE: prefix differs from endpointGRUBatch — intentional per BB API docs.
+	endpointGRUBatchRequest = "/lotes-gru/%s/solicitacao" // NOTE: prefix differs from endpointGRUBatch intentional per BB API docs.
 	endpointGRUPayment      = "/gru/%s"
 )
 

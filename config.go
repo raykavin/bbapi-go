@@ -31,7 +31,7 @@ const (
 // Zero values for duration and retry fields mean "use the default".
 // To explicitly disable retries, set MaxRetries to -1.
 //
-// mTLS (mutual TLS) — required for Banco do Brasil production endpoints:
+// mTLS (mutual TLS) required for Banco do Brasil production endpoints:
 // Provide the client certificate and key either as file paths (MTLSCertFile /
 // MTLSKeyFile) or as PEM-encoded bytes (MTLSCertPEM / MTLSKeyPEM). File paths
 // take precedence when both are set. Optionally supply a custom CA root via
@@ -55,11 +55,11 @@ type Config struct {
 	RetryWaitMin time.Duration
 	RetryWaitMax time.Duration
 
-	// mTLS client certificate — file path (takes precedence over PEM bytes).
+	// mTLS client certificate file path (takes precedence over PEM bytes).
 	MTLSCertFile string
 	MTLSKeyFile  string
 
-	// mTLS client certificate — raw PEM-encoded bytes.
+	// mTLS client certificate raw PEM-encoded bytes.
 	MTLSCertPEM []byte
 	MTLSKeyPEM  []byte
 
