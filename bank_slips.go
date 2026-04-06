@@ -153,6 +153,10 @@ func (c *Client) CreateBankSlipBatch(
 	ctx context.Context,
 	req *CreateBankSlipBatchRequest,
 ) (*CreateBankSlipBatchResponse, error) {
+	if err := c.requireMTLS(); err != nil {
+		return nil, err
+	}
+
 	return post[*CreateBankSlipBatchResponse](c, ctx, endpointBankSlipBatch, req)
 }
 
@@ -162,6 +166,10 @@ func (c *Client) GetBankSlipBatchRequest(
 	id string,
 	params *AccountLookupParams,
 ) (*GetBankSlipBatchRequestResponse, error) {
+	if err := c.requireMTLS(); err != nil {
+		return nil, err
+	}
+
 	query := url.Values{}
 	setAccountLookupQuery(query, params, "agencia", "contaCorrente", "digitoVerificador")
 	return get[*GetBankSlipBatchRequestResponse](
@@ -176,6 +184,10 @@ func (c *Client) GetBankSlipPayment(
 	id string,
 	params *AccountLookupParams,
 ) (*GetBankSlipPaymentResponse, error) {
+	if err := c.requireMTLS(); err != nil {
+		return nil, err
+	}
+
 	query := url.Values{}
 	setAccountLookupQuery(query, params, "agencia", "contaCorrente", "digitoVerificador")
 	return get[*GetBankSlipPaymentResponse](

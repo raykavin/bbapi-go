@@ -33,6 +33,28 @@ func newTestClient(t *testing.T, server *httptest.Server) *bbapi.Client {
 	return c
 }
 
+// newMTLSTestClient is like newTestClient but marks the client as mTLS-enabled,
+// simulating a production client that presents a certificate.
+func newMTLSTestClient(t *testing.T, server *httptest.Server) *bbapi.Client {
+	t.Helper()
+	c, err := bbapi.NewClient(bbapi.Config{
+		ClientID:     "test-client-id",
+		ClientSecret: "test-client-secret",
+		AppKey:       "test-app-key",
+		APIURL:       server.URL,
+		AuthURL:      server.URL + "/oauth/token",
+		AccessToken:  "test-bearer-token",
+		MaxRetries:   0,
+		RetryWaitMin: time.Millisecond,
+		RetryWaitMax: time.Millisecond,
+		MTLSEnabled:  true,
+	})
+	if err != nil {
+		t.Fatalf("NewClient (mTLS): %v", err)
+	}
+	return c
+}
+
 func readJSONBody(t *testing.T, body io.Reader, target any) {
 	t.Helper()
 	if err := json.NewDecoder(body).Decode(target); err != nil {
@@ -417,6 +439,97 @@ func TestAPIError_ServerError(t *testing.T) {
 	if !bbapi.IsServerError(err) {
 		t.Fatalf("expected IsServerError, got: %v", err)
 	}
+}
+
+// TestDARF_RequiresMTLS verifies that all DARF methods refuse to proceed when
+// the client was not configured with a client certificate.
+func TestDARF_RequiresMTLS(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("server should not be reached when mTLS is not configured")
+	}))
+	defer srv.Close()
+
+	c := newTestClient(t, srv)
+	ctx := context.Background()
+
+	t.Run("CreateDARFBatch", func(t *testing.T) {
+		_, err := c.CreateDARFBatch(ctx, &bbapi.CreateDARFBatchRequest{})
+		if err != bbapi.ErrMTLSRequired {
+			t.Fatalf("want ErrMTLSRequired, got: %v", err)
+		}
+	})
+
+	t.Run("GetDARFBatchRequest", func(t *testing.T) {
+		_, err := c.GetDARFBatchRequest(ctx, "123", nil)
+		if err != bbapi.ErrMTLSRequired {
+			t.Fatalf("want ErrMTLSRequired, got: %v", err)
+		}
+	})
+
+	t.Run("GetDARFPayment", func(t *testing.T) {
+		_, err := c.GetDARFPayment(ctx, "123", nil)
+		if err != bbapi.ErrMTLSRequired {
+			t.Fatalf("want ErrMTLSRequired, got: %v", err)
+		}
+	})
+}
+
+// TestDARF_WithMTLS verifies that DARF methods proceed normally when the client
+// is configured as mTLS-enabled.
+func TestDARF_WithMTLS(t *testing.T) {
+	t.Run("CreateDARFBatch", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(bbapi.CreateDARFBatchResponse{ID: 42})
+		}))
+		defer srv.Close()
+
+		c := newMTLSTestClient(t, srv)
+		resp, err := c.CreateDARFBatch(context.Background(), &bbapi.CreateDARFBatchRequest{
+			RequestID: 1,
+			Entries:   []bbapi.DARFEntry{{PaymentDate: 15042026, PaymentValue: 100.0}},
+		})
+		if err != nil {
+			t.Fatalf("CreateDARFBatch: %v", err)
+		}
+		if resp.ID != 42 {
+			t.Fatalf("unexpected response ID: %d", resp.ID)
+		}
+	})
+
+	t.Run("GetDARFBatchRequest", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(bbapi.GetDARFBatchRequestResponse{ID: 99, EntryCount: 3})
+		}))
+		defer srv.Close()
+
+		c := newMTLSTestClient(t, srv)
+		resp, err := c.GetDARFBatchRequest(context.Background(), "99", nil)
+		if err != nil {
+			t.Fatalf("GetDARFBatchRequest: %v", err)
+		}
+		if resp.ID != 99 || resp.EntryCount != 3 {
+			t.Fatalf("unexpected response: %+v", resp)
+		}
+	})
+
+	t.Run("GetDARFPayment", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(bbapi.GetDARFPaymentResponse{ID: 7, PaymentState: "LIQUIDADO"})
+		}))
+		defer srv.Close()
+
+		c := newMTLSTestClient(t, srv)
+		resp, err := c.GetDARFPayment(context.Background(), "7", nil)
+		if err != nil {
+			t.Fatalf("GetDARFPayment: %v", err)
+		}
+		if resp.ID != 7 || resp.PaymentState != "LIQUIDADO" {
+			t.Fatalf("unexpected response: %+v", resp)
+		}
+	})
 }
 
 func ptrInt64(value int64) *int64 {

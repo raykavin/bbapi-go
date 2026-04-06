@@ -250,6 +250,10 @@ func (c *Client) GetBarcodePayments(
 	id string,
 	params *AccountLookupParams,
 ) (*BarcodePaymentsResponse, error) {
+	if err := c.requireMTLS(); err != nil {
+		return nil, err
+	}
+
 	query := url.Values{}
 	setAccountLookupQuery(query, params, "agenciaDebito", "contaCorrenteDebito", "digitoVerificadorContaCorrente")
 	return get[*BarcodePaymentsResponse](c, ctx, buildPath(fmt.Sprintf(endpointBarcodePayments, id), query))

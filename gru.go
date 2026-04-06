@@ -167,6 +167,10 @@ func (c *Client) GetGRUBatchRequest(
 	id string,
 	params *AccountLookupParams,
 ) (*GetGRUBatchRequestResponse, error) {
+	if err := c.requireMTLS(); err != nil {
+		return nil, err
+	}
+
 	query := url.Values{}
 	setAccountLookupQuery(query, params, "numeroAgenciaDebito",
 		"numeroContaCorrenteDebito", "digitoVerificadorContaCorrenteDebito")
@@ -182,6 +186,10 @@ func (c *Client) GetGRUPayment(
 	id string,
 	params *AccountLookupParams,
 ) (*GetGRUPaymentResponse, error) {
+	if err := c.requireMTLS(); err != nil {
+		return nil, err
+	}
+
 	query := url.Values{}
 	setAccountLookupQuery(query, params,
 		"agencia", "contaCorrente", "digitoVerificador")

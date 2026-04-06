@@ -153,19 +153,28 @@ type GetDARFPaymentResponse struct {
 }
 
 // CreateDARFBatch creates a DARF batch.
+// Requires mutual TLS — see Config.MTLSCertFile / Config.MTLSCertPEM.
 func (c *Client) CreateDARFBatch(
 	ctx context.Context,
 	req *CreateDARFBatchRequest,
 ) (*CreateDARFBatchResponse, error) {
+	if err := c.requireMTLS(); err != nil {
+		return nil, err
+	}
 	return post[*CreateDARFBatchResponse](c, ctx, endpointDARFBatch, req)
 }
 
 // GetDARFBatchRequest returns the request-stage representation of a DARF batch.
+// Requires mutual TLS see Config.MTLSCertFile / Config.MTLSCertPEM.
 func (c *Client) GetDARFBatchRequest(
 	ctx context.Context,
 	id string,
 	params *AccountLookupParams,
 ) (*GetDARFBatchRequestResponse, error) {
+	if err := c.requireMTLS(); err != nil {
+		return nil, err
+	}
+
 	query := url.Values{}
 	setAccountLookupQuery(query, params, "numeroAgenciaDebito", "numeroContaCorrenteDebito", "digitoVerificadorContaCorrenteDebito")
 	return get[*GetDARFBatchRequestResponse](
@@ -175,11 +184,15 @@ func (c *Client) GetDARFBatchRequest(
 }
 
 // GetDARFPayment returns a single DARF payment.
+// Requires mutual TLS — see Config.MTLSCertFile / Config.MTLSCertPEM.
 func (c *Client) GetDARFPayment(
 	ctx context.Context,
 	id string,
 	params *AccountLookupParams,
 ) (*GetDARFPaymentResponse, error) {
+	if err := c.requireMTLS(); err != nil {
+		return nil, err
+	}
 	query := url.Values{}
 	setAccountLookupQuery(query, params, "agencia", "contaCorrente", "digitoVerificador")
 	return get[*GetDARFPaymentResponse](
