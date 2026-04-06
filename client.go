@@ -40,6 +40,7 @@ type Client struct {
 	config      Config
 	httpClient  *http.Client
 	mtlsEnabled bool
+	sandboxMode bool
 	tokenMu     sync.RWMutex
 	token       tokenState
 }
@@ -64,6 +65,7 @@ func NewClient(cfg Config) (*Client, error) {
 		config:      cfg,
 		httpClient:  cfg.HTTPClient,
 		mtlsEnabled: cfg.MTLSEnabled,
+		sandboxMode: cfg.Sandbox,
 	}
 	if cfg.AccessToken != "" {
 		c.token.accessToken = cfg.AccessToken
@@ -123,10 +125,10 @@ func (c *Client) TokenExpiresAt() time.Time {
 }
 
 // requireMTLS returns ErrMTLSRequired if the client was not configured with
-// mutual TLS. Call this at the top of any method that the BB API mandates a
-// client certificate for.
+// mutual TLS and not in sandbox mode. Call this at the top of any method
+// that the BB API mandates a client certificate for.
 func (c *Client) requireMTLS() error {
-	if !c.mtlsEnabled {
+	if !c.mtlsEnabled && !c.sandboxMode {
 		return ErrMTLSRequired
 	}
 	return nil
@@ -160,7 +162,12 @@ func (c *Client) ensureToken(ctx context.Context) (string, error) {
 	return tr.AccessToken, nil
 }
 
-func (c *Client) do(ctx context.Context, method, rawURL string, payload []byte, contentType string) ([]byte, int, error) {
+func (c *Client) do(
+	ctx context.Context,
+	method, rawURL string,
+	payload []byte,
+	contentType string,
+) ([]byte, int, error) {
 	var (
 		responseBody []byte
 		statusCode   int
