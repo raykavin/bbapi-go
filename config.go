@@ -20,10 +20,11 @@ const (
 )
 
 const (
-	sandboxAPIURL     = "https://homologa-api-ip.bb.com.br:7144/pagamentos-lote/v1"
-	productionAPIURL  = "https://api-ip.bb.com.br/pagamentos-lote/v1"
-	sandboxAuthURL    = "https://oauth.sandbox.bb.com.br/oauth/token"
-	productionAuthURL = "https://oauth.bb.com.br/oauth/token"
+	sandboxAPIURL       = "https://homologa-api-ip.bb.com.br:7144/pagamentos-lote/v1"
+	sandboxNoMTLSAPIURL = "https://api.hm.bb.com.br/pagamentos-lote/v1"
+	productionAPIURL    = "https://api-ip.bb.com.br/pagamentos-lote/v1"
+	sandboxAuthURL      = "https://oauth.sandbox.bb.com.br/oauth/token"
+	productionAuthURL   = "https://oauth.bb.com.br/oauth/token"
 )
 
 // Config holds all configuration for the BB API client.
@@ -97,6 +98,9 @@ func (c *Config) setDefaults() error {
 
 	if c.APIURL == "" {
 		c.APIURL = pickURL(c.Sandbox, sandboxAPIURL, productionAPIURL)
+		if !c.hasMTLS() {
+			c.APIURL = pickURL(c.Sandbox, sandboxNoMTLSAPIURL, productionAPIURL)
+		}
 	}
 
 	if c.AuthURL == "" {
