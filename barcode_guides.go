@@ -126,6 +126,10 @@ func (c *Client) GetBarcodeGuideBatchRequest(
 	id string,
 	params *AccountLookupParams,
 ) (*GetBarcodeGuideBatchRequestResponse, error) {
+	if err := c.requireMTLS(); err != nil {
+		return nil, err
+	}
+
 	query := url.Values{}
 	setAccountLookupQuery(query, params, "agencia", "contaCorrente", "digitoVerificador")
 	return get[*GetBarcodeGuideBatchRequestResponse](
@@ -140,6 +144,10 @@ func (c *Client) GetBarcodeGuidePayment(
 	id string,
 	params *AccountLookupParams,
 ) (*GetBarcodeGuidePaymentResponse, error) {
+	if err := c.requireMTLS(); err != nil {
+		return nil, err
+	}
+
 	query := url.Values{}
 	setAccountLookupQuery(query, params, "agencia", "contaCorrente", "digitoVerificador")
 	return get[*GetBarcodeGuidePaymentResponse](

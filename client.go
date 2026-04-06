@@ -37,10 +37,11 @@ func (t tokenState) isValid(now time.Time) bool {
 
 // Client is the Banco do Brasil SDK client. It is safe for concurrent use.
 type Client struct {
-	config     Config
-	httpClient *http.Client
-	tokenMu    sync.RWMutex
-	token      tokenState
+	config      Config
+	httpClient  *http.Client
+	mtlsEnabled bool
+	tokenMu     sync.RWMutex
+	token       tokenState
 }
 
 // NewClient creates and validates a new Banco do Brasil API client.
@@ -55,11 +56,14 @@ func NewClient(cfg Config) (*Client, error) {
 		return nil, errors.New("bbapi: AppKey is required")
 	}
 
-	cfg.setDefaults()
+	if err := cfg.setDefaults(); err != nil {
+		return nil, err
+	}
 
 	c := &Client{
-		config:     cfg,
-		httpClient: cfg.HTTPClient,
+		config:      cfg,
+		httpClient:  cfg.HTTPClient,
+		mtlsEnabled: cfg.MTLSEnabled,
 	}
 	if cfg.AccessToken != "" {
 		c.token.accessToken = cfg.AccessToken
@@ -116,6 +120,16 @@ func (c *Client) TokenExpiresAt() time.Time {
 	c.tokenMu.RLock()
 	defer c.tokenMu.RUnlock()
 	return c.token.expiresAt
+}
+
+// requireMTLS returns ErrMTLSRequired if the client was not configured with
+// mutual TLS. Call this at the top of any method that the BB API mandates a
+// client certificate for.
+func (c *Client) requireMTLS() error {
+	if !c.mtlsEnabled {
+		return ErrMTLSRequired
+	}
+	return nil
 }
 
 func (c *Client) apiURL(path string) string {

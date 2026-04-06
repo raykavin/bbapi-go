@@ -133,6 +133,10 @@ func (c *Client) CreateGPSBatch(
 	ctx context.Context,
 	req *CreateGPSBatchRequest,
 ) (*CreateGPSBatchResponse, error) {
+	if err := c.requireMTLS(); err != nil {
+		return nil, err
+	}
+
 	return post[*CreateGPSBatchResponse](c, ctx, endpointGPSBatch, req)
 }
 
@@ -142,6 +146,10 @@ func (c *Client) GetGPSBatchRequest(
 	id string,
 	params *AccountLookupParams,
 ) (*GetGPSBatchRequestResponse, error) {
+	if err := c.requireMTLS(); err != nil {
+		return nil, err
+	}
+
 	query := url.Values{}
 	setAccountLookupQuery(query, params, "numeroAgenciaDebito",
 		"numeroContaCorrenteDebito", "digitoVerificadorContaCorrenteDebito")
@@ -157,6 +165,10 @@ func (c *Client) GetGPSPayment(
 	id string,
 	params *AccountLookupParams,
 ) (*GetGPSPaymentResponse, error) {
+	if err := c.requireMTLS(); err != nil {
+		return nil, err
+	}
+
 	query := url.Values{}
 	setAccountLookupQuery(query, params, "agencia", "contaCorrente", "digitoVerificador")
 	return get[*GetGPSPaymentResponse](

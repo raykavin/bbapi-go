@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	gokitretry "github.com/raykavin/gokit/retry"
+	gkretry "github.com/raykavin/gokit/retry"
 )
 
 // Do wraps the currently available retry dependency behind an internal package
@@ -17,7 +17,7 @@ func Do(
 	shouldRetry func(attempt int, err error) bool,
 	fn func() error,
 ) error {
-	return gokitretry.Do(
+	return gkretry.Do(
 		ctx,
 		maxAttempts,
 		waitMin,

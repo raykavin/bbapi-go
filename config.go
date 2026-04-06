@@ -1,7 +1,11 @@
 package bbapi
 
 import (
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -26,6 +30,14 @@ const (
 //
 // Zero values for duration and retry fields mean "use the default".
 // To explicitly disable retries, set MaxRetries to -1.
+//
+// mTLS (mutual TLS) — required for Banco do Brasil production endpoints:
+// Provide the client certificate and key either as file paths (MTLSCertFile /
+// MTLSKeyFile) or as PEM-encoded bytes (MTLSCertPEM / MTLSKeyPEM). File paths
+// take precedence when both are set. Optionally supply a custom CA root via
+// MTLSCARootFile or MTLSCARootPEM. When any mTLS field is set and HTTPClient
+// is nil, the SDK builds an http.Client with the appropriate tls.Config
+// automatically.
 type Config struct {
 	ClientID     string
 	ClientSecret string
@@ -42,9 +54,28 @@ type Config struct {
 	MaxRetries   int
 	RetryWaitMin time.Duration
 	RetryWaitMax time.Duration
+
+	// mTLS client certificate — file path (takes precedence over PEM bytes).
+	MTLSCertFile string
+	MTLSKeyFile  string
+
+	// mTLS client certificate — raw PEM-encoded bytes.
+	MTLSCertPEM []byte
+	MTLSKeyPEM  []byte
+
+	// Optional custom CA root used to verify the server certificate.
+	// File path takes precedence over PEM bytes.
+	MTLSCARootFile string
+	MTLSCARootPEM  []byte
+
+	// MTLSEnabled marks the client as mTLS-capable. It is set automatically
+	// when MTLSCertFile/MTLSKeyFile or MTLSCertPEM/MTLSKeyPEM are provided.
+	// Set it to true manually when passing a pre-configured HTTPClient that
+	// already presents a client certificate.
+	MTLSEnabled bool
 }
 
-func (c *Config) setDefaults() {
+func (c *Config) setDefaults() error {
 	if c.Timeout <= 0 {
 		c.Timeout = defaultTimeout
 	}
@@ -73,8 +104,80 @@ func (c *Config) setDefaults() {
 	}
 
 	if c.HTTPClient == nil {
-		c.HTTPClient = &http.Client{Timeout: c.Timeout}
+		if c.hasMTLS() {
+			var err error
+			c.HTTPClient, err = c.buildMTLSClient()
+			if err != nil {
+				return err
+			}
+			c.MTLSEnabled = true
+		} else {
+			c.HTTPClient = &http.Client{Timeout: c.Timeout}
+		}
 	}
+
+	return nil
+}
+
+func (c *Config) hasMTLS() bool {
+	return c.MTLSCertFile != "" || len(c.MTLSCertPEM) > 0
+}
+
+// buildMTLSClient constructs an *http.Client whose TLS transport presents the
+// configured client certificate to the server (mutual TLS).
+func (c *Config) buildMTLSClient() (*http.Client, error) {
+	var (
+		certPEM []byte
+		keyPEM  []byte
+		err     error
+	)
+
+	if c.MTLSCertFile != "" {
+		certPEM, err = os.ReadFile(c.MTLSCertFile)
+		if err != nil {
+			return nil, fmt.Errorf("bbapi: mtls: read cert file: %w", err)
+		}
+		keyPEM, err = os.ReadFile(c.MTLSKeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("bbapi: mtls: read key file: %w", err)
+		}
+	} else {
+		certPEM = c.MTLSCertPEM
+		keyPEM = c.MTLSKeyPEM
+	}
+
+	cert, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		return nil, fmt.Errorf("bbapi: mtls: parse key pair: %w", err)
+	}
+
+	tlsCfg := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+	}
+
+	if c.MTLSCARootFile != "" || len(c.MTLSCARootPEM) > 0 {
+		var caPEM []byte
+		if c.MTLSCARootFile != "" {
+			caPEM, err = os.ReadFile(c.MTLSCARootFile)
+			if err != nil {
+				return nil, fmt.Errorf("bbapi: mtls: read ca root file: %w", err)
+			}
+		} else {
+			caPEM = c.MTLSCARootPEM
+		}
+
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(caPEM) {
+			return nil, fmt.Errorf("bbapi: mtls: failed to parse CA root certificate")
+		}
+		tlsCfg.RootCAs = pool
+	}
+
+	transport := &http.Transport{TLSClientConfig: tlsCfg}
+	return &http.Client{
+		Transport: transport,
+		Timeout:   c.Timeout,
+	}, nil
 }
 
 // pickURL returns sandboxVal when sandbox is true, otherwise productionVal.

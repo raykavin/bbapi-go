@@ -425,6 +425,10 @@ func (c *Client) ListTransferBatches(
 	ctx context.Context,
 	params *ListTransferBatchesParams,
 ) (*ListTransferBatchesResponse, error) {
+	if err := c.requireMTLS(); err != nil {
+		return nil, err
+	}
+
 	query := url.Values{}
 	if params != nil {
 		setInt64(query, "numeroContratoPagamento", params.PaymentContractNumber)
@@ -445,6 +449,10 @@ func (c *Client) CreateTransferBatch(
 	ctx context.Context,
 	req *CreateTransferBatchRequest,
 ) (*CreateTransferBatchResponse, error) {
+	if err := c.requireMTLS(); err != nil {
+		return nil, err
+	}
+
 	return post[*CreateTransferBatchResponse](c, ctx, endpointTransferBatches, req)
 }
 
@@ -454,6 +462,10 @@ func (c *Client) GetTransferPayment(
 	id string,
 	params *AccountLookupParams,
 ) (*GetTransferPaymentResponse, error) {
+	if err := c.requireMTLS(); err != nil {
+		return nil, err
+	}
+
 	query := url.Values{}
 	setAccountLookupQuery(query, params, "agencia", "contaCorrente", "digitoVerificador")
 	return get[*GetTransferPaymentResponse](
@@ -464,11 +476,19 @@ func (c *Client) GetTransferPayment(
 
 // GetBatchRequest returns the request-stage representation of a batch.
 func (c *Client) GetBatchRequest(ctx context.Context, id string) (*GetBatchRequestResponse, error) {
+	if err := c.requireMTLS(); err != nil {
+		return nil, err
+	}
+
 	return get[*GetBatchRequestResponse](c, ctx, fmt.Sprintf(endpointBatchRequest, id))
 }
 
 // GetBatch returns a payment batch by identifier.
 func (c *Client) GetBatch(ctx context.Context, id string) (*GetBatchResponse, error) {
+	if err := c.requireMTLS(); err != nil {
+		return nil, err
+	}
+
 	return get[*GetBatchResponse](c, ctx, fmt.Sprintf(endpointBatch, id))
 }
 
@@ -478,6 +498,10 @@ func (c *Client) ListBeneficiaryTransfers(
 	id string,
 	params *ListBeneficiaryTransfersParams,
 ) (*ListBeneficiaryTransfersResponse, error) {
+	if err := c.requireMTLS(); err != nil {
+		return nil, err
+	}
+
 	query := url.Values{}
 	if params != nil {
 		setInt64(query, "agenciaDebito", params.DebitAgency)
@@ -506,6 +530,10 @@ func (c *Client) CreatePixTransferBatch(
 	ctx context.Context,
 	req *CreatePixTransferBatchRequest,
 ) (*CreatePixTransferBatchResponse, error) {
+	if err := c.requireMTLS(); err != nil {
+		return nil, err
+	}
+
 	return post[*CreatePixTransferBatchResponse](c, ctx, endpointPixTransferBatches, req)
 }
 
@@ -515,6 +543,10 @@ func (c *Client) GetPixTransferBatchRequest(
 	id string,
 	params *AccountLookupParams,
 ) (*GetPixTransferBatchRequestResponse, error) {
+	if err := c.requireMTLS(); err != nil {
+		return nil, err
+	}
+
 	query := url.Values{}
 	setAccountLookupQuery(query, params, "agencia", "contaCorrente", "digitoVerificador")
 	return get[*GetPixTransferBatchRequestResponse](
@@ -529,6 +561,10 @@ func (c *Client) GetPixPayment(
 	id string,
 	params *GetPixPaymentParams,
 ) (*GetPixPaymentResponse, error) {
+	if err := c.requireMTLS(); err != nil {
+		return nil, err
+	}
+
 	query := url.Values{}
 	if params != nil {
 		setInt64(query, "agencia", params.Agency)
