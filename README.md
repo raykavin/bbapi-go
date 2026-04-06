@@ -3,10 +3,60 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/raykavin/bbapi-go.svg)](https://pkg.go.dev/github.com/raykavin/bbapi-go)
 [![Go Version](https://img.shields.io/badge/go-1.25+-blue)](https://golang.org/dl/)
 [![Go Report Card](https://goreportcard.com/badge/github.com/raykavin/bbapi-go)](https://goreportcard.com/report/github.com/raykavin/bbapi-go)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.md)
 
-A Go library for **Banco do Brasil APIs**.
+An unofficial Go SDK for [Banco do Brasil](https://developers.bb.com.br) APIs.
 
-The project is structured to support multiple Banco do Brasil API resources over time.
+`bbapi-go` provides a clean, type-safe client for interacting with BB's platform. It handles OAuth2 authentication, automatic token renewal, transient-error retries, and response parsing, so you can focus on your application logic rather than HTTP plumbing.
+
+> **Disclaimer:** This project is an unofficial client library for the
+> [Banco do Brasil Open Finance APIs](https://developers.bb.com.br).
+> It is not affiliated with, endorsed by, or maintained by Banco do Brasil S.A.
+> "BB" and "Banco do Brasil" are registered trademarks of Banco do Brasil S.A.
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+- [Authentication](#authentication)
+- [OAuth Scopes](#oauth-scopes)
+- [API Coverage](#api-coverage)
+  - [Batch Payments: Transfers (TED/DOC)](#batch-payments--transfers-teddoc)
+  - [Batch Payments: Pix Transfers](#batch-payments--pix-transfers)
+  - [Batch Payments: Payment Management](#batch-payments--payment-management)
+  - [Batch Payments: Bank Slips](#batch-payments--bank-slips)
+  - [Batch Payments: Barcode Guides](#batch-payments--barcode-guides)
+  - [Batch Payments: DARF](#batch-payments--darf)
+  - [Batch Payments: GPS](#batch-payments--gps)
+  - [Batch Payments: GRU](#batch-payments--gru)
+- [Error Handling](#error-handling)
+- [Retry Behavior](#retry-behavior)
+- [Constants Reference](#constants-reference)
+- [Project Layout](#project-layout)
+- [Testing](#testing)
+- [License](#license)
+
+---
+
+## Features
+
+- OAuth2 `client_credentials` flow with automatic token caching and renewal
+- Typed request and response structs for all supported endpoints
+- Built-in exponential backoff retry for transient failures
+- Sandbox and production environments switchable via a single config flag
+- Thread-safe client, safe for concurrent use across goroutines
+- Easily extendable, new API resources can be added without modifying the core client
+
+---
+
+## Requirements
+
+- Go **1.25** or later
 
 ---
 
@@ -16,13 +66,11 @@ The project is structured to support multiple Banco do Brasil API resources over
 go get github.com/raykavin/bbapi-go
 ```
 
-Requires **Go 1.25+**.
-
-The SDK uses `github.com/raykavin/gokit/http` for HTTP requests and includes retry support for transient failures.
-
 ---
 
 ## Quick Start
+
+The example below authenticates using the OAuth2 `client_credentials` flow and submits a batch of TED/DOC transfers.
 
 ```go
 package main
@@ -51,11 +99,10 @@ func main() {
 
 	ctx := context.Background()
 
-	tokenResp, err := client.Authenticate(ctx)
-	if err != nil {
+	// Authenticate and cache the token, subsequent calls reuse it automatically.
+	if _, err = client.Authenticate(ctx); err != nil {
 		log.Fatal(err)
 	}
-	client.SetTokenResponse(tokenResp)
 
 	resp, err := client.CreateTransferBatch(ctx, &bbapi.CreateTransferBatchRequest{
 		RequestNumber: 123,
@@ -87,60 +134,58 @@ client, err := bbapi.NewClient(bbapi.Config{
 	AppKey:       "your-app-key",
 
 	// Optional defaults shown
-	Sandbox:      true,
-	APIURL:       "",
-	AuthURL:      "",
-	AccessToken:  "",
-	Scopes:       []bbapi.Scope{},
-	HTTPClient:   &http.Client{},
+	Sandbox:      false,
+	APIURL:       "",             // overrides the default base URL
+	AuthURL:      "",             // overrides the default OAuth token URL
+	AccessToken:  "",             // pre-load a token instead of authenticating
+	Scopes:       nil,
+	HTTPClient:   nil,            // uses a default *http.Client
 	Timeout:      30 * time.Second,
-	MaxRetries:   3,
+	MaxRetries:   3,              // set to -1 to disable retries entirely
 	RetryWaitMin: 1 * time.Second,
 	RetryWaitMax: 10 * time.Second,
 })
 ```
 
-### Default URLs
+### Config Fields
 
-The default API URLs below point to the API currently implemented by this version of the SDK:
+| Field | Type | Description |
+|---|---|---|
+| `ClientID` | `string` | Banco do Brasil application client ID |
+| `ClientSecret` | `string` | Banco do Brasil application client secret |
+| `AppKey` | `string` | Application key required by the BB API gateway |
+| `Sandbox` | `bool` | When `true`, routes all requests to BB sandbox endpoints |
+| `APIURL` | `string` | Optional override for the API base URL |
+| `AuthURL` | `string` | Optional override for the OAuth token URL |
+| `AccessToken` | `string` | Pre-load an existing access token, skipping initial authentication |
+| `Scopes` | `[]Scope` | OAuth scopes requested during authentication |
+| `HTTPClient` | `*http.Client` | Optional custom HTTP client |
+| `Timeout` | `time.Duration` | Per-request timeout (default: `30s`) |
+| `MaxRetries` | `int` | Number of retry attempts for transient failures (default: `3`) |
+| `RetryWaitMin` | `time.Duration` | Minimum backoff between retries (default: `1s`) |
+| `RetryWaitMax` | `time.Duration` | Maximum backoff between retries (default: `10s`) |
 
-- Sandbox API: `https://homologa-api-ip.bb.com.br:7144/pagamentos-lote/v1`
-- Production API: `https://api-ip.bb.com.br/pagamentos-lote/v1`
-- Sandbox OAuth: `https://oauth.sandbox.bb.com.br/oauth/token`
-- Production OAuth: `https://oauth.bb.com.br/oauth/token`
+### Default Endpoints
 
-### Config fields
-
-| Field | Description |
-|---|---|
-| `ClientID` | Banco do Brasil application client ID |
-| `ClientSecret` | Banco do Brasil application client secret |
-| `AppKey` | Application key required by the API |
-| `Sandbox` | Switches the client to BB sandbox endpoints |
-| `APIURL` | Optional API base URL override |
-| `AuthURL` | Optional OAuth token URL override |
-| `AccessToken` | Optional preloaded access token |
-| `Scopes` | OAuth scopes requested during authentication |
-| `HTTPClient` | Optional custom `*http.Client` |
-| `Timeout` | Request timeout |
-| `MaxRetries` | Retry attempts for transient failures |
-| `RetryWaitMin` | Minimum retry backoff |
-| `RetryWaitMax` | Maximum retry backoff |
+| Environment | API | OAuth |
+|---|---|---|
+| Sandbox | `https://homologa-api-ip.bb.com.br:7144/pagamentos-lote/v1` | `https://oauth.sandbox.bb.com.br/oauth/token` |
+| Production | `https://api-ip.bb.com.br/pagamentos-lote/v1` | `https://oauth.bb.com.br/oauth/token` |
 
 ---
 
 ## Authentication
 
-The SDK supports OAuth2 using the `client_credentials` flow.
+The SDK uses the OAuth2 `client_credentials` flow. A valid token is required before any API call. Once obtained, the client caches it and reuses it for subsequent requests. If the token expires or a `401` is returned, the client re-authenticates automatically.
 
 ### Authenticate with configured credentials
 
 ```go
-tokenResp, err := client.Authenticate(ctx)
-if err != nil {
+// Uses ClientID, ClientSecret, and Scopes from Config.
+// The token is cached internally; no need to call SetTokenResponse manually.
+if _, err := client.Authenticate(ctx); err != nil {
 	log.Fatal(err)
 }
-client.SetTokenResponse(tokenResp)
 ```
 
 ### Authenticate with explicit credentials
@@ -160,210 +205,263 @@ client.SetTokenResponse(tokenResp)
 ### Set a token manually
 
 ```go
+// Useful when your application manages token acquisition externally.
 client.SetAccessToken("your-access-token")
 ```
 
-### Token lifecycle
+### Inspect the current token
 
 ```go
-token := client.GetAccessToken()
+token     := client.GetAccessToken()
 expiresAt := client.TokenExpiresAt()
-
-_ = token
-_ = expiresAt
 ```
-
-If no valid token is cached, the client authenticates automatically before calling the API.
 
 ---
 
 ## OAuth Scopes
 
-The package exposes typed scope constants, including:
+The package exposes typed `Scope` constants for every permission supported by the API. Pass the scopes your application needs during initialization or authentication.
 
-- `bbapi.ScopeTransfersInfo`
-- `bbapi.ScopeTransfersRequest`
-- `bbapi.ScopePixInfo`
-- `bbapi.ScopePixTransfersInfo`
-- `bbapi.ScopePixTransfersRequest`
-- `bbapi.ScopePaymentsInfo`
-- `bbapi.ScopeBatchesInfo`
-- `bbapi.ScopeBatchesRequest`
-- `bbapi.ScopeBankSlipsInfo`
-- `bbapi.ScopeBankSlipsRequest`
-- `bbapi.ScopeBarcodeGuidesInfo`
-- `bbapi.ScopeBarcodeGuidesRequest`
-- `bbapi.ScopeReturnedPaymentsInfo`
-- `bbapi.ScopeCancelRequest`
-
-See [doc.go](/workspaces/app/doc.go) for the full list.
-
----
-
-## Implemented Coverage
-
-The API specification currently bundled with this repository defines **30 unique HTTP operations**, and this SDK implements all **30**.
-
-### Payment Management
-
-- `ReleasePayments`
-- `CancelPayments`
-- `UpdatePaymentDates`
-- `ListReturnedPayments`
-- `ListPaymentEntries`
-- `GetBarcodePayments`
-
-### Transfers
-
-- `ListTransferBatches`
-- `CreateTransferBatch`
-- `GetBatch`
-- `GetBatchRequest`
-- `GetTransferPayment`
-- `ListBeneficiaryTransfers`
-
-### Pix Transfers
-
-- `CreatePixTransferBatch`
-- `GetPixTransferBatchRequest`
-- `GetPixPayment`
-
-### Bank Slips
-
-- `CreateBankSlipBatch`
-- `GetBankSlipBatchRequest`
-- `GetBankSlipPayment`
-
-### Barcode Guides
-
-- `CreateBarcodeGuideBatch`
-- `GetBarcodeGuideBatchRequest`
-- `GetBarcodeGuidePayment`
-
-### DARF
-
-- `CreateDARFBatch`
-- `GetDARFBatchRequest`
-- `GetDARFPayment`
-
-### GPS
-
-- `CreateGPSBatch`
-- `GetGPSBatchRequest`
-- `GetGPSPayment`
-
-### GRU
-
-- `CreateGRUBatch`
-- `GetGRUBatchRequest`
-- `GetGRUPayment`
-
-### Implemented resource prefixes
-
-- `/pagamentos`
-- `/liberar-pagamentos`
-- `/cancelar-pagamentos`
-- `/lancamentos-periodo`
-- `/lotes-transferencias`
-- `/transferencias`
-- `/beneficiarios`
-- `/lotes-transferencias-pix`
-- `/pix`
-- `/lotes-boletos`
-- `/boletos`
-- `/lotes-guias-codigo-barras`
-- `/guias-codigo-barras`
-- `/pagamentos-codigo-barras`
-- `/lotes-darf-normal-preto`
-- `/lotes-darf-preto-normal`
-- `/darf-preto`
-- `/lotes-gps`
-- `/gps`
-- `/pagamentos-gru`
-- `/lotes-gru`
-- `/gru`
-- `/{id}`
+| Constant | Value |
+|---|---|
+| `ScopeBatchesInfo` | `pagamentos-lote.lotes-info` |
+| `ScopeBatchesRequest` | `pagamentos-lote.lotes-requisicao` |
+| `ScopePaymentsInfo` | `pagamentos-lote.pagamentos-info` |
+| `ScopeReturnedPaymentsInfo` | `pagamentos-lote.devolvidos-info` |
+| `ScopeCancelRequest` | `pagamentos-lote.cancelar-requisicao` |
+| `ScopeTransfersInfo` | `pagamentos-lote.transferencias-info` |
+| `ScopeTransfersRequest` | `pagamentos-lote.transferencias-requisicao` |
+| `ScopePixInfo` | `pagamentos-lote.pix-info` |
+| `ScopePixTransfersInfo` | `pagamentos-lote.transferencias-pix-info` |
+| `ScopePixTransfersRequest` | `pagamentos-lote.transferencias-pix-requisicao` |
+| `ScopeBankSlipsInfo` | `pagamentos-lote.boletos-info` |
+| `ScopeBankSlipsRequest` | `pagamentos-lote.boletos-requisicao` |
+| `ScopeBarcodeGuidesInfo` | `pagamentos-lote.guias-codigo-barras-info` |
+| `ScopeBarcodeGuidesRequest` | `pagamentos-lote.guias-codigo-barras-requisicao` |
+| `ScopeBarcodePaymentsInfo` | `pagamentos-lote.pagamentos-codigo-barras-info` |
+| `ScopeManualGuidePaymentsInfo` | `pagamentos-lote.pagamentos-guias-sem-codigo-barras-info` |
+| `ScopeManualGuidePaymentsRequest` | `pagamentos-lote.pagamentos-guias-sem-codigo-barras-requisicao` |
 
 ---
 
-## Useful Constants
+## API Coverage
 
-### Payment types
+The SDK implements all **30** operations defined in the current Banco do Brasil Batch Payments API specification.
 
-- `bbapi.PaymentTypeSuppliers`
-- `bbapi.PaymentTypeSalary`
-- `bbapi.PaymentTypeMiscellaneous`
+---
 
-### Request states
+### Batch Payments — Transfers (TED/DOC)
 
-- `bbapi.PaymentRequestStateConsistent`
-- `bbapi.PaymentRequestStateInconsistent`
-- `bbapi.PaymentRequestStateAllInconsistent`
-- `bbapi.PaymentRequestStatePending`
-- `bbapi.PaymentRequestStateProcessing`
-- `bbapi.PaymentRequestStateProcessed`
-- `bbapi.PaymentRequestStateRejected`
-- `bbapi.PaymentRequestStatePreparingUnreleased`
-- `bbapi.PaymentRequestStateReleasedByAPI`
-- `bbapi.PaymentRequestStatePreparingReleased`
+Submit and query batches of TED/DOC bank transfers.
+
+| Method | Description |
+|---|---|
+| `CreateTransferBatch(ctx, *CreateTransferBatchRequest)` | Submit a new transfer batch |
+| `ListTransferBatches(ctx, *ListTransferBatchesParams)` | List existing transfer batches |
+| `GetBatch(ctx, id)` | Retrieve a batch by ID |
+| `GetBatchRequest(ctx, id)` | Retrieve the request-stage details of a batch |
+| `GetTransferPayment(ctx, id, *AccountLookupParams)` | Retrieve a single transfer payment |
+| `ListBeneficiaryTransfers(ctx, id, *ListBeneficiaryTransfersParams)` | List transfers for a specific beneficiary |
+
+**Example creating a transfer batch:**
+
+```go
+resp, err := client.CreateTransferBatch(ctx, &bbapi.CreateTransferBatchRequest{
+	RequestNumber: 42,
+	PaymentType:   bbapi.PaymentTypeSalary,
+	Transfers: []bbapi.Transfer{
+		{TransferDate: 15052026, TransferValue: 3500.00},
+		{TransferDate: 15052026, TransferValue: 2800.50},
+	},
+})
+if err != nil {
+	log.Fatal(err)
+}
+log.Printf("batch_id=%d state=%d", resp.RequestIdentifier, resp.RequestState)
+```
+
+---
+
+### Batch Payments Pix Transfers
+
+Submit and query Pix transfer batches.
+
+| Method | Description |
+|---|---|
+| `CreatePixTransferBatch(ctx, *CreatePixTransferBatchRequest)` | Submit a new Pix transfer batch |
+| `GetPixTransferBatchRequest(ctx, id)` | Retrieve the request-stage details of a Pix batch |
+| `GetPixPayment(ctx, id, *GetPixPaymentParams)` | Retrieve a single Pix payment |
+
+**Example creating a Pix transfer batch:**
+
+```go
+resp, err := client.CreatePixTransferBatch(ctx, &bbapi.CreatePixTransferBatchRequest{
+	RequestNumber: 99,
+	PixTransfers: []bbapi.PixTransfer{
+		{TransferDate: 15052026, TransferValue: 500.00},
+	},
+})
+if err != nil {
+	log.Fatal(err)
+}
+log.Printf("batch_id=%d state=%d", resp.RequestIdentifier, resp.RequestState)
+```
+
+---
+
+### Batch Payments Payment Management
+
+Cross-cutting operations that apply to payments regardless of type.
+
+| Method | Description |
+|---|---|
+| `ReleasePayments(ctx, *ReleasePaymentsRequest)` | Release a batch for processing |
+| `CancelPayments(ctx, *CancelPaymentsRequest)` | Cancel one or more payments |
+| `UpdatePaymentDates(ctx, id, *UpdatePaymentDatesRequest)` | Reschedule payment dates |
+| `ListReturnedPayments(ctx, *ListReturnedPaymentsParams)` | List returned/reversed payments |
+| `ListPaymentEntries(ctx, *ListPaymentEntriesParams)` | List payment ledger entries for a period |
+| `GetBarcodePayments(ctx, id, *AccountLookupParams)` | Retrieve barcode-linked payment details |
+
+---
+
+### Batch Payments Bank Slips
+
+Submit and query bank slip (_boleto_) batches.
+
+| Method | Description |
+|---|---|
+| `CreateBankSlipBatch(ctx, *CreateBankSlipBatchRequest)` | Submit a new bank slip batch |
+| `GetBankSlipBatchRequest(ctx, id, *AccountLookupParams)` | Retrieve the request-stage details |
+| `GetBankSlipPayment(ctx, id, *AccountLookupParams)` | Retrieve a single bank slip payment |
+
+---
+
+### Batch Payments Barcode Guides
+
+Submit and query barcode guide (_guia de código de barras_) batches.
+
+| Method | Description |
+|---|---|
+| `CreateBarcodeGuideBatch(ctx, *CreateBarcodeGuideBatchRequest)` | Submit a new barcode guide batch |
+| `GetBarcodeGuideBatchRequest(ctx, id, *AccountLookupParams)` | Retrieve the request-stage details |
+| `GetBarcodeGuidePayment(ctx, id, *AccountLookupParams)` | Retrieve a single barcode guide payment |
+
+---
+
+### Batch Payments DARF
+
+Submit and query DARF (federal tax collection document) batches.
+
+| Method | Description |
+|---|---|
+| `CreateDARFBatch(ctx, *CreateDARFBatchRequest)` | Submit a new DARF batch |
+| `GetDARFBatchRequest(ctx, id, *AccountLookupParams)` | Retrieve the request-stage details |
+| `GetDARFPayment(ctx, id, *AccountLookupParams)` | Retrieve a single DARF payment |
+
+---
+
+### Batch Payments GPS
+
+Submit and query GPS (social security guide) batches.
+
+| Method | Description |
+|---|---|
+| `CreateGPSBatch(ctx, *CreateGPSBatchRequest)` | Submit a new GPS batch |
+| `GetGPSBatchRequest(ctx, id, *AccountLookupParams)` | Retrieve the request-stage details |
+| `GetGPSPayment(ctx, id, *AccountLookupParams)` | Retrieve a single GPS payment |
+
+---
+
+### Batch Payments GRU
+
+Submit and query GRU (federal government collection guide) batches.
+
+| Method | Description |
+|---|---|
+| `CreateGRUBatch(ctx, *CreateGRUBatchRequest)` | Submit a new GRU batch |
+| `GetGRUBatchRequest(ctx, id, *AccountLookupParams)` | Retrieve the request-stage details |
+| `GetGRUPayment(ctx, id, *AccountLookupParams)` | Retrieve a single GRU payment |
 
 ---
 
 ## Error Handling
 
-Errors returned by Banco do Brasil's API and OAuth server are normalized into `*bbapi.APIError`.
+All API and OAuth errors are normalized into `*bbapi.APIError`, giving you a consistent interface regardless of which endpoint was called.
 
 ```go
-resp, err := client.GetGRUPayment(ctx, "123", nil)
+resp, err := client.GetTransferPayment(ctx, "12345", nil)
 if err != nil {
 	var apiErr *bbapi.APIError
 	if errors.As(err, &apiErr) {
-		log.Printf("status=%d message=%s", apiErr.StatusCode, apiErr.Message)
+		log.Printf("HTTP %d: %s", apiErr.StatusCode, apiErr.Message)
+		for _, detail := range apiErr.Details {
+			log.Printf("  [%s] %s", detail.Codigo, detail.Mensagem)
+		}
 	}
 	log.Fatal(err)
 }
-
-_ = resp
 ```
 
-Helper functions are available for common checks:
+The following helper functions are available for common status checks:
 
-- `bbapi.IsNotFound(err)`
-- `bbapi.IsUnauthorized(err)`
-- `bbapi.IsForbidden(err)`
-- `bbapi.IsRateLimited(err)`
-- `bbapi.IsServerError(err)`
+| Function | Condition |
+|---|---|
+| `bbapi.IsNotFound(err)` | HTTP 404 |
+| `bbapi.IsUnauthorized(err)` | HTTP 401 |
+| `bbapi.IsForbidden(err)` | HTTP 403 |
+| `bbapi.IsRateLimited(err)` | HTTP 429 |
+| `bbapi.IsServerError(err)` | HTTP 5xx |
+
+```go
+if bbapi.IsNotFound(err) {
+	// handle missing resource
+}
+```
 
 ---
 
 ## Retry Behavior
 
-The client retries transient failures, including:
+The client automatically retries requests that fail due to transient conditions:
 
-- `429 Too Many Requests`
-- `500 Internal Server Error`
-- `502 Bad Gateway`
-- `503 Service Unavailable`
-- `504 Gateway Timeout`
+| Status | Meaning |
+|---|---|
+| `429` | Too Many Requests |
+| `500` | Internal Server Error |
+| `502` | Bad Gateway |
+| `503` | Service Unavailable |
+| `504` | Gateway Timeout |
 
-The client also clears the cached token and re-authenticates after a `401 Unauthorized` response when appropriate.
+Retries use exponential backoff bounded by `RetryWaitMin` and `RetryWaitMax`. The number of attempts is controlled by `MaxRetries` (default: `3`). Set `MaxRetries: -1` to disable retries entirely.
+
+A `401 Unauthorized` response causes the client to clear the cached token and re-authenticate before the next attempt.
 
 ---
 
-## Testing
+## Constants Reference
 
-Run the test suite with:
+### Payment Types
 
-```bash
-go test ./...
-```
+| Constant | Value | Description |
+|---|---|---|
+| `PaymentTypeSuppliers` | `126` | Supplier payments |
+| `PaymentTypeSalary` | `127` | Payroll / salary payments |
+| `PaymentTypeMiscellaneous` | `128` | General-purpose payments |
 
-Current tests cover:
+### Request States
 
-- request construction
-- model serialization and deserialization
-- response parsing
-- error handling
+| Constant | Value | Description |
+|---|---|---|
+| `PaymentRequestStateConsistent` | `1` | Request is consistent |
+| `PaymentRequestStateInconsistent` | `2` | Request has inconsistencies |
+| `PaymentRequestStateAllInconsistent` | `3` | All entries are inconsistent |
+| `PaymentRequestStatePending` | `4` | Awaiting release |
+| `PaymentRequestStateProcessing` | `5` | Being processed |
+| `PaymentRequestStateProcessed` | `6` | Successfully processed |
+| `PaymentRequestStateRejected` | `7` | Rejected |
+| `PaymentRequestStatePreparingUnreleased` | `8` | Preparing — not yet released |
+| `PaymentRequestStateReleasedByAPI` | `9` | Released via API |
+| `PaymentRequestStatePreparingReleased` | `10` | Preparing — already released |
 
 ---
 
@@ -371,23 +469,54 @@ Current tests cover:
 
 | File | Responsibility |
 |---|---|
-| `client.go` | Core client, token reuse, request execution, retry integration |
-| `config.go` | SDK configuration and defaults |
-| `auth.go` | OAuth authentication |
-| `errors.go` | API error parsing and helpers |
-| `helpers.go` | Shared request and decoding helpers |
+| `client.go` | Core client, token lifecycle, request execution, retry integration |
+| `config.go` | SDK configuration struct and default values |
+| `auth.go` | OAuth2 authentication |
+| `errors.go` | API error types and helper functions |
+| `helpers.go` | Generic request/response helpers |
 | `payments.go` | General payment management endpoints |
-| `transfers.go` | Transfers and Pix transfers |
-| `bank_slips.go` | Bank slip endpoints |
+| `transfers.go` | TED/DOC and Pix transfer endpoints |
+| `bank_slips.go` | Bank slip (_boleto_) endpoints |
 | `barcode_guides.go` | Barcode guide endpoints |
-| `darf.go` | DARF endpoints |
-| `gps.go` | GPS endpoints |
-| `gru.go` | GRU endpoints |
+| `darf.go` | DARF (federal tax) endpoints |
+| `gps.go` | GPS (social security) endpoints |
+| `gru.go` | GRU (public sector) endpoints |
+| `doc.go` | Package-level documentation and constants |
 
 ---
 
-## Notes
+## Testing
 
-- All Go identifiers are intentionally written in English.
-- Banco do Brasil JSON field names remain mapped through `json` tags.
-- The codebase is organized so new Banco do Brasil APIs can be added later without changing the current client structure.
+Run the full test suite with:
+
+```bash
+go test ./...
+```
+
+The tests cover client initialization, token management, OAuth flows, request construction, model serialization, response parsing, error handling, and retry behavior.
+
+---
+## Contributing
+
+Contributions to bbapi-go are welcome! Here are some ways you can help improve the project:
+
+- **Report bugs and suggest features** by opening issues on GitHub
+- **Submit pull requests** with bug fixes or new features
+- **Improve documentation** to help other users and developers
+- **Share your custom strategies** with the community
+
+---
+
+## License
+bbapi-go is distributed under the **MIT License**.  
+For complete license terms and conditions, see the [LICENSE](LICENSE.md) file in the repository.
+
+---
+
+## Contact
+
+For support, collaboration, or questions about bbapi-go:
+
+**Email**: [raykavin.meireles@gmail.com](mailto:raykavin.meireles@gmail.com)  
+**LinkedIn**: [@raykavin.dev](https://www.linkedin.com/in/raykavin-dev)  
+**GitHub**: [@raykavin](https://github.com/raykavin)  
