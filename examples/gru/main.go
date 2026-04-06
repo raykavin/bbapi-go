@@ -40,6 +40,7 @@ func main() {
 		Scopes: []bbapi.Scope{
 			bbapi.ScopeManualGuidePaymentsRequest,
 			bbapi.ScopeManualGuidePaymentsInfo,
+			bbapi.ScopeBatchesRequest,
 		},
 	})
 	if err != nil {
