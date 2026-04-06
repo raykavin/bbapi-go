@@ -15,9 +15,9 @@ import (
 // DARF (Federal Revenue Collection Document) payments:
 //
 //	Revenue  Taxpayer                   Id.Code  Assessment  Reference  Principal    Fine   Interest  Total      Due
-//	6106     75.224.842/0001-26         18       30/11/2021  1          128.01                      128.01     31/12/2021
-//	5952     26.707.621/0001-01         16       30/11/2021  112021     1,116.00     7.36           1,123.36   31/12/2021
-//	1708     93.809.477/0001-01         16       30/11/2021           300.00       1.98           301.98     31/12/2021
+//	6106     75.224.842/0001-26         18       14/04/2026  1          128.01                      128.01     15/04/2026
+//	5952     26.707.621/0001-01         16       14/04/2026  112021     1,116.00     7.36           1,123.36   15/04/2026
+//	1708     93.809.477/0001-01         16       14/04/2026             300.00       1.98           301.98     15/04/2026
 func main() {
 	client, err := bbapi.NewClient(bbapi.Config{
 		ClientID:     os.Getenv("BB_CLIENT_ID"),
@@ -36,54 +36,54 @@ func main() {
 	}
 
 	ctx := context.Background()
-	paymentDate := int64(31122021)    // 31/12/2021 in ddmmaaaa format.
-	assessmentDate := int64(30112021) // 30/11/2021 in ddmmaaaa format.
+	paymentDate := int64(15042026)    // 15/04/2026 in ddmmaaaa format.
+	assessmentDate := int64(14042026) // 14/04/2026 in ddmmaaaa format.
 
 	batch, err := client.CreateDARFBatch(ctx, &bbapi.CreateDARFBatchRequest{
-		RequestID:              5001,
+		RequestID:              examples.RandomReqNumber(),
 		DebitAgencyNumber:      examples.Ptr[int64](1607),
 		DebitAccountNumber:     examples.Ptr[int64](99738672),
 		DebitAccountCheckDigit: examples.Ptr("X"),
 		Entries: []bbapi.DARFEntry{
 			{
 				// Revenue 6106 | CNPJ 75.224.842/0001-26 | id code 18
-				// Assessment 30/11/2021 | ref. 1 | principal 128.01 | total 128.01 | due 31/12/2021
+				// Assessment 14/04/2026 | ref. 1 | principal 128.01 | total 128.01 | due 15/04/2026
 				PaymentDate:            paymentDate,
 				PaymentValue:           128.01,
 				TaxRevenueCode:         examples.Ptr[int64](6106),
 				TaxpayerTypeCode:       examples.Ptr[int64](18),
 				TaxpayerIdentification: examples.Ptr[int64](75224842000126),
-				AssessmentDate:         examples.Ptr[int64](assessmentDate),
+				AssessmentDate:         examples.Ptr(assessmentDate),
 				ReferenceNumber:        examples.Ptr[int64](1),
 				PrincipalValue:         examples.Ptr(128.01),
-				DueDate:                examples.Ptr[int64](paymentDate),
+				DueDate:                examples.Ptr(paymentDate),
 			},
 			{
 				// Revenue 5952 | CNPJ 26.707.621/0001-01 | id code 16
-				// Assessment 30/11/2021 | ref. 112021 | principal 1,116.00 | fine 7.36 | total 1,123.36 | due 31/12/2021
+				// Assessment 14/04/2026 | ref. 112021 | principal 1,116.00 | fine 7.36 | total 1,123.36 | due 15/04/2026
 				PaymentDate:            paymentDate,
 				PaymentValue:           1123.36,
 				TaxRevenueCode:         examples.Ptr[int64](5952),
 				TaxpayerTypeCode:       examples.Ptr[int64](16),
 				TaxpayerIdentification: examples.Ptr[int64](26707621000101),
-				AssessmentDate:         examples.Ptr[int64](assessmentDate),
+				AssessmentDate:         examples.Ptr(assessmentDate),
 				ReferenceNumber:        examples.Ptr[int64](112021),
 				PrincipalValue:         examples.Ptr(1116.00),
 				FineValue:              examples.Ptr(7.36),
-				DueDate:                examples.Ptr[int64](paymentDate),
+				DueDate:                examples.Ptr(paymentDate),
 			},
 			{
 				// Revenue 1708 | CNPJ 93.809.477/0001-01 | id code 16
-				// Assessment 30/11/2021 | principal 300.00 | fine 1.98 | total 301.98 | due 31/12/2021
+				// Assessment 14/04/2026 | principal 300.00 | fine 1.98 | total 301.98 | due 15/04/2026
 				PaymentDate:            paymentDate,
 				PaymentValue:           301.98,
 				TaxRevenueCode:         examples.Ptr[int64](1708),
 				TaxpayerTypeCode:       examples.Ptr[int64](16),
 				TaxpayerIdentification: examples.Ptr[int64](93809477000101),
-				AssessmentDate:         examples.Ptr[int64](assessmentDate),
+				AssessmentDate:         examples.Ptr(assessmentDate),
 				PrincipalValue:         examples.Ptr(300.00),
 				FineValue:              examples.Ptr(1.98),
-				DueDate:                examples.Ptr[int64](paymentDate),
+				DueDate:                examples.Ptr(paymentDate),
 			},
 		},
 	})

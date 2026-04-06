@@ -86,7 +86,7 @@ type Transfer struct {
 
 // TransferResult represents a transfer returned in request responses.
 type TransferResult struct {
-	TransferIdentifier      int64   `json:"identificadorTransferencia,omitempty"`
+	TransferIdentifier      string  `json:"identificadorTransferencia,omitempty"`
 	CreditType              int64   `json:"tipoCredito,omitempty"`
 	COMPENumber             int64   `json:"numeroCOMPE,omitempty"`
 	ISPBNumber              int64   `json:"numeroISPB,omitempty"`

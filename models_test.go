@@ -69,7 +69,7 @@ func TestCreateTransferBatchResponseUnmarshal(t *testing.T) {
 	if response.RequestState != 1 || response.TransferCount != 2 || len(response.Transfers) != 1 {
 		t.Fatalf("unexpected response: %+v", response)
 	}
-	if response.Transfers[0].TransferIdentifier != 11 {
+	if response.Transfers[0].TransferIdentifier != "11" {
 		t.Fatalf("unexpected transfer identifier: %+v", response.Transfers[0])
 	}
 }

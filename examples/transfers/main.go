@@ -123,13 +123,13 @@ func main() {
 		salaryBatch.ValidTransferValue,
 	)
 	for i, t := range salaryBatch.Transfers {
-		fmt.Printf("  [%d] id=%d accepted=%q errors=%v\n",
+		fmt.Printf("  [%d] id=%s accepted=%q errors=%v\n",
 			i+1, t.TransferIdentifier, t.AcceptanceIndicator, t.Errors)
 	}
 
 	// Supplier batch (CNPJ)
 	supplierBatch, err := client.CreateTransferBatch(ctx, &bbapi.CreateTransferBatchRequest{
-		RequestNumber:          1002,
+		RequestNumber:          examples.RandomReqNumber(),
 		PaymentContractNumber:  examples.Ptr[int64](731030),
 		DebitAgency:            examples.Ptr[int64](1607),
 		DebitAccount:           examples.Ptr[int64](99738672),
@@ -199,7 +199,7 @@ func main() {
 		supplierBatch.ValidTransferValue,
 	)
 	for i, t := range supplierBatch.Transfers {
-		fmt.Printf("  [%d] id=%d accepted=%q errors=%v\n",
+		fmt.Printf("  [%d] id=%s accepted=%q errors=%v\n",
 			i+1, t.TransferIdentifier, t.AcceptanceIndicator, t.Errors)
 	}
 }
