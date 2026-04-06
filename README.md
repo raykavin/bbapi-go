@@ -24,6 +24,7 @@ An unofficial Go SDK for [Banco do Brasil](https://developers.bb.com.br) APIs.
 - [Quick Start](#quick-start)
 - [Configuration](#configuration)
 - [Authentication](#authentication)
+- [Mutual TLS (mTLS)](#mutual-tls-mtls)
 - [OAuth Scopes](#oauth-scopes)
 - [API Coverage](#api-coverage)
   - [Batch Payments: Transfers (TED/DOC)](#batch-payments--transfers-teddoc)
@@ -46,6 +47,7 @@ An unofficial Go SDK for [Banco do Brasil](https://developers.bb.com.br) APIs.
 ## Features
 
 - OAuth2 `client_credentials` flow with automatic token caching and renewal
+- Mutual TLS (mTLS) support required for BB production endpoints that demand a client certificate
 - Typed request and response structs for all supported endpoints
 - Built-in exponential backoff retry for transient failures
 - Sandbox and production environments switchable via a single config flag
@@ -144,6 +146,10 @@ client, err := bbapi.NewClient(bbapi.Config{
 	MaxRetries:   3,              // set to -1 to disable retries entirely
 	RetryWaitMin: 1 * time.Second,
 	RetryWaitMax: 10 * time.Second,
+
+	// mTLS required for production endpoints that demand a client certificate
+	MTLSCertFile: "",             // path to PEM-encoded client certificate file
+	MTLSKeyFile:  "",             // path to PEM-encoded private key file
 })
 ```
 
@@ -164,6 +170,13 @@ client, err := bbapi.NewClient(bbapi.Config{
 | `MaxRetries` | `int` | Number of retry attempts for transient failures (default: `3`) |
 | `RetryWaitMin` | `time.Duration` | Minimum backoff between retries (default: `1s`) |
 | `RetryWaitMax` | `time.Duration` | Maximum backoff between retries (default: `10s`) |
+| `MTLSCertFile` | `string` | Path to the PEM-encoded client certificate file |
+| `MTLSKeyFile` | `string` | Path to the PEM-encoded private key file |
+| `MTLSCertPEM` | `[]byte` | Client certificate as raw PEM bytes (alternative to file path) |
+| `MTLSKeyPEM` | `[]byte` | Private key as raw PEM bytes (alternative to file path) |
+| `MTLSCARootFile` | `string` | Path to a custom CA root certificate file (optional) |
+| `MTLSCARootPEM` | `[]byte` | Custom CA root certificate as raw PEM bytes (optional) |
+| `MTLSEnabled` | `bool` | Set to `true` when providing a pre-configured `HTTPClient` with mTLS |
 
 ### Default Endpoints
 
@@ -218,6 +231,82 @@ expiresAt := client.TokenExpiresAt()
 
 ---
 
+## Mutual TLS (mTLS)
+
+Several Banco do Brasil production endpoints require the HTTP client to present a certificate during the TLS handshake ([see the official list](https://apoio.developers.bb.com.br/guias-e-tutoriais/seguranca/apis-que-exigem-certificado)). The SDK supports this natively when any mTLS field is set and `HTTPClient` is `nil`, a transport with the correct `tls.Config` is built automatically.
+
+Calling a method that requires mTLS without configuring a certificate returns `bbapi.ErrMTLSRequired` immediately, before any network request is made.
+
+### Using certificate files
+
+```go
+client, err := bbapi.NewClient(bbapi.Config{
+	ClientID:     "your-client-id",
+	ClientSecret: "your-client-secret",
+	AppKey:       "your-app-key",
+	MTLSCertFile: "/etc/ssl/bb/client.crt",
+	MTLSKeyFile:  "/etc/ssl/bb/client.key",
+})
+```
+
+### Using PEM bytes (e.g. from a secrets manager)
+
+```go
+certPEM, _ := secretsManager.GetSecret("bb-client-cert")
+keyPEM,  _ := secretsManager.GetSecret("bb-client-key")
+
+client, err := bbapi.NewClient(bbapi.Config{
+	ClientID:     "your-client-id",
+	ClientSecret: "your-client-secret",
+	AppKey:       "your-app-key",
+	MTLSCertPEM:  certPEM,
+	MTLSKeyPEM:   keyPEM,
+})
+```
+
+### Using a custom CA root
+
+```go
+client, err := bbapi.NewClient(bbapi.Config{
+	ClientID:       "your-client-id",
+	ClientSecret:   "your-client-secret",
+	AppKey:         "your-app-key",
+	MTLSCertFile:   "/etc/ssl/bb/client.crt",
+	MTLSKeyFile:    "/etc/ssl/bb/client.key",
+	MTLSCARootFile: "/etc/ssl/bb/ca-root.crt",
+})
+```
+
+### Bringing your own http.Client
+
+If you build and configure the `http.Client` yourself (e.g. with additional middleware), set `MTLSEnabled: true` so the SDK knows the client already presents a certificate:
+
+```go
+client, err := bbapi.NewClient(bbapi.Config{
+	ClientID:     "your-client-id",
+	ClientSecret: "your-client-secret",
+	AppKey:       "your-app-key",
+	HTTPClient:   myPreConfiguredMTLSClient,
+	MTLSEnabled:  true,
+})
+```
+
+### APIs that require mTLS
+
+The following methods enforce the mTLS requirement and return `bbapi.ErrMTLSRequired` if no certificate is configured:
+
+| Group | Methods |
+|---|---|
+| DARF | `CreateDARFBatch`, `GetDARFBatchRequest`, `GetDARFPayment` |
+| GPS | `CreateGPSBatch`, `GetGPSBatchRequest`, `GetGPSPayment` |
+| GRU | `CreateGRUBatch`, `GetGRUBatchRequest`, `GetGRUPayment` |
+| Bank Slips | `CreateBankSlipBatch`, `GetBankSlipBatchRequest`, `GetBankSlipPayment` |
+| Barcode Guides | `CreateBarcodeGuideBatch`, `GetBarcodeGuideBatchRequest`, `GetBarcodeGuidePayment` |
+| Payments | `ReleasePayments`, `CancelPayments`, `UpdatePaymentDates`, `ListReturnedPayments`, `ListPaymentEntries`, `GetBarcodePayments` |
+| Transfers | `ListTransferBatches`, `CreateTransferBatch`, `GetTransferPayment`, `GetBatchRequest`, `GetBatch`, `ListBeneficiaryTransfers`, `CreatePixTransferBatch`, `GetPixTransferBatchRequest`, `GetPixPayment` |
+
+---
+
 ## OAuth Scopes
 
 The package exposes typed `Scope` constants for every permission supported by the API. Pass the scopes your application needs during initialization or authentication.
@@ -250,7 +339,7 @@ The SDK implements all **30** operations defined in the current Banco do Brasil 
 
 ---
 
-### Batch Payments — Transfers (TED/DOC)
+### Batch Payments Transfers (TED/DOC)
 
 Submit and query batches of TED/DOC bank transfers.
 
@@ -418,6 +507,15 @@ if bbapi.IsNotFound(err) {
 }
 ```
 
+`bbapi.ErrMTLSRequired` is a sentinel error returned when a method that requires mutual TLS is called without a client certificate configured. Check for it with `errors.Is`:
+
+```go
+resp, err := client.CreateDARFBatch(ctx, req)
+if errors.Is(err, bbapi.ErrMTLSRequired) {
+	log.Fatal("configure MTLSCertFile/MTLSKeyFile to use this API in production")
+}
+```
+
 ---
 
 ## Retry Behavior
@@ -459,9 +557,9 @@ A `401 Unauthorized` response causes the client to clear the cached token and re
 | `PaymentRequestStateProcessing` | `5` | Being processed |
 | `PaymentRequestStateProcessed` | `6` | Successfully processed |
 | `PaymentRequestStateRejected` | `7` | Rejected |
-| `PaymentRequestStatePreparingUnreleased` | `8` | Preparing — not yet released |
+| `PaymentRequestStatePreparingUnreleased` | `8` | Preparing not yet released |
 | `PaymentRequestStateReleasedByAPI` | `9` | Released via API |
-| `PaymentRequestStatePreparingReleased` | `10` | Preparing — already released |
+| `PaymentRequestStatePreparingReleased` | `10` | Preparing already released |
 
 ---
 
@@ -493,7 +591,7 @@ Run the full test suite with:
 go test ./...
 ```
 
-The tests cover client initialization, token management, OAuth flows, request construction, model serialization, response parsing, error handling, and retry behavior.
+The tests cover client initialization, token management, OAuth flows, request construction, model serialization, response parsing, error handling, retry behavior, and mTLS enforcement.
 
 ---
 ## Contributing

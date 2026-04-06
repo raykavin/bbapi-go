@@ -153,7 +153,7 @@ type GetDARFPaymentResponse struct {
 }
 
 // CreateDARFBatch creates a DARF batch.
-// Requires mutual TLS — see Config.MTLSCertFile / Config.MTLSCertPEM.
+// Requires mutual TLS see Config.MTLSCertFile / Config.MTLSCertPEM.
 func (c *Client) CreateDARFBatch(
 	ctx context.Context,
 	req *CreateDARFBatchRequest,
@@ -184,7 +184,7 @@ func (c *Client) GetDARFBatchRequest(
 }
 
 // GetDARFPayment returns a single DARF payment.
-// Requires mutual TLS — see Config.MTLSCertFile / Config.MTLSCertPEM.
+// Requires mutual TLS see Config.MTLSCertFile / Config.MTLSCertPEM.
 func (c *Client) GetDARFPayment(
 	ctx context.Context,
 	id string,
