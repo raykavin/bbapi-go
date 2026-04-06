@@ -22,6 +22,7 @@ An unofficial Go SDK for [Banco do Brasil](https://developers.bb.com.br) APIs.
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
+- [Examples](#examples)
 - [Configuration](#configuration)
 - [Authentication](#authentication)
 - [Mutual TLS (mTLS)](#mutual-tls-mtls)
@@ -72,7 +73,7 @@ go get github.com/raykavin/bbapi-go
 
 ## Quick Start
 
-The example below authenticates using the OAuth2 `client_credentials` flow and submits a batch of TED/DOC transfers.
+The example below authenticates using the OAuth2 `client_credentials` flow and submits a batch of TED/DOC transfers. For complete sandbox payloads aligned with Banco do Brasil homologation data, see the runnable programs in [`examples/`](examples/).
 
 ```go
 package main
@@ -90,9 +91,10 @@ func main() {
 		ClientSecret: "your-client-secret",
 		AppKey:       "your-app-key",
 		Sandbox:      true,
+		MTLSCertFile: "/path/to/client.crt",
+		MTLSKeyFile:  "/path/to/client.key",
 		Scopes: []bbapi.Scope{
 			bbapi.ScopeTransfersRequest,
-			bbapi.ScopeBatchesRequest,
 		},
 	})
 	if err != nil {
@@ -120,9 +122,37 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Printf("request_state=%d transfer_count=%d", resp.RequestState, resp.TransferCount)
+	log.Printf("request_state=%d valid_transfer_count=%d", resp.RequestState, resp.ValidTransferCount)
 }
 ```
+
+---
+
+## Examples
+
+Runnable examples are available in [`examples/`](examples/) and mirror the sandbox or homologation data used in the Banco do Brasil batch payments documentation. The request payloads use the numeric date format `ddmmaaaa`, matching the API field definitions.
+
+- [`examples/transfers/main.go`](examples/transfers/main.go): TED/DOC transfer batches for salary and supplier payments
+- [`examples/pix/main.go`](examples/pix/main.go): Pix transfers by key and by account data
+- [`examples/barcode_guides/main.go`](examples/barcode_guides/main.go): barcode guide batch payments
+- [`examples/gru/main.go`](examples/gru/main.go): GRU batch payments
+- [`examples/darf/main.go`](examples/darf/main.go): DARF batch payments
+- [`examples/gps/main.go`](examples/gps/main.go): GPS batch payments
+- [`examples/helper.go`](examples/helper.go): shared helpers for pointers and random request numbers
+
+Run any example with the BB credentials and, if desired, certificate files:
+
+```bash
+export BB_CLIENT_ID=your-client-id
+export BB_CLIENT_SECRET=your-client-secret
+export BB_APP_KEY=your-app-key
+export BB_CERT_FILE=/path/to/client.crt
+export BB_KEY_FILE=/path/to/client.key
+
+go run ./examples/pix
+```
+
+In tests or sandbox usage, `BB_CERT_FILE` and `BB_KEY_FILE` are optional. If they are not provided, the SDK uses the sandbox endpoint without mTLS. If you provide them, the SDK uses the sandbox mTLS endpoint instead.
 
 ---
 
@@ -233,7 +263,7 @@ expiresAt := client.TokenExpiresAt()
 
 ## Mutual TLS (mTLS)
 
-Several Banco do Brasil production endpoints require the HTTP client to present a certificate during the TLS handshake ([see the official list](https://apoio.developers.bb.com.br/guias-e-tutoriais/seguranca/apis-que-exigem-certificado)). The SDK supports this natively when any mTLS field is set and `HTTPClient` is `nil`, a transport with the correct `tls.Config` is built automatically.
+Various Banco do Brasil production endpoints require the HTTP client to present a certificate during the TLS handshake ([see the official list](https://apoio.developers.bb.com.br/guias-e-tutoriais/seguranca/apis-que-exigem-certificado)). The SDK supports this natively when any mTLS field is set and `HTTPClient` is `nil`, a transport with the correct `tls.Config` is built automatically.
 
 Calling a method that requires mTLS without configuring a certificate returns `bbapi.ErrMTLSRequired` immediately, before any network request is made.
 
@@ -352,22 +382,9 @@ Submit and query batches of TED/DOC bank transfers.
 | `GetTransferPayment(ctx, id, *AccountLookupParams)` | Retrieve a single transfer payment |
 | `ListBeneficiaryTransfers(ctx, id, *ListBeneficiaryTransfersParams)` | List transfers for a specific beneficiary |
 
-**Example creating a transfer batch:**
+Runnable example: [`examples/transfers/main.go`](examples/transfers/main.go)
 
-```go
-resp, err := client.CreateTransferBatch(ctx, &bbapi.CreateTransferBatchRequest{
-	RequestNumber: 42,
-	PaymentType:   bbapi.PaymentTypeSalary,
-	Transfers: []bbapi.Transfer{
-		{TransferDate: 15052026, TransferValue: 3500.00},
-		{TransferDate: 15052026, TransferValue: 2800.50},
-	},
-})
-if err != nil {
-	log.Fatal(err)
-}
-log.Printf("batch_id=%d state=%d", resp.RequestIdentifier, resp.RequestState)
-```
+The example uses the homologation debit account `1607 / 99738672-X`, contract `731030`, and the documented CPF/CNPJ beneficiaries for salary and supplier payments.
 
 ---
 
@@ -381,20 +398,9 @@ Submit and query Pix transfer batches.
 | `GetPixTransferBatchRequest(ctx, id)` | Retrieve the request-stage details of a Pix batch |
 | `GetPixPayment(ctx, id, *GetPixPaymentParams)` | Retrieve a single Pix payment |
 
-**Example creating a Pix transfer batch:**
+Runnable example: [`examples/pix/main.go`](examples/pix/main.go)
 
-```go
-resp, err := client.CreatePixTransferBatch(ctx, &bbapi.CreatePixTransferBatchRequest{
-	RequestNumber: 99,
-	PixTransfers: []bbapi.PixTransfer{
-		{TransferDate: 15052026, TransferValue: 500.00},
-	},
-})
-if err != nil {
-	log.Fatal(err)
-}
-log.Printf("batch_id=%d state=%d", resp.RequestIdentifier, resp.RequestState)
-```
+The example covers Pix by key using the homologation phone, email, CPF, CNPJ, and random identifiers, plus Pix by account data with COMPE `1`.
 
 ---
 
@@ -435,6 +441,8 @@ Submit and query barcode guide (_guia de código de barras_) batches.
 | `GetBarcodeGuideBatchRequest(ctx, id, *AccountLookupParams)` | Retrieve the request-stage details |
 | `GetBarcodeGuidePayment(ctx, id, *AccountLookupParams)` | Retrieve a single barcode guide payment |
 
+Runnable example: [`examples/barcode_guides/main.go`](examples/barcode_guides/main.go)
+
 ---
 
 ### Batch Payments DARF
@@ -446,6 +454,8 @@ Submit and query DARF (federal tax collection document) batches.
 | `CreateDARFBatch(ctx, *CreateDARFBatchRequest)` | Submit a new DARF batch |
 | `GetDARFBatchRequest(ctx, id, *AccountLookupParams)` | Retrieve the request-stage details |
 | `GetDARFPayment(ctx, id, *AccountLookupParams)` | Retrieve a single DARF payment |
+
+Runnable example: [`examples/darf/main.go`](examples/darf/main.go)
 
 ---
 
@@ -459,6 +469,8 @@ Submit and query GPS (social security guide) batches.
 | `GetGPSBatchRequest(ctx, id, *AccountLookupParams)` | Retrieve the request-stage details |
 | `GetGPSPayment(ctx, id, *AccountLookupParams)` | Retrieve a single GPS payment |
 
+Runnable example: [`examples/gps/main.go`](examples/gps/main.go)
+
 ---
 
 ### Batch Payments GRU
@@ -470,6 +482,8 @@ Submit and query GRU (federal government collection guide) batches.
 | `CreateGRUBatch(ctx, *CreateGRUBatchRequest)` | Submit a new GRU batch |
 | `GetGRUBatchRequest(ctx, id, *AccountLookupParams)` | Retrieve the request-stage details |
 | `GetGRUPayment(ctx, id, *AccountLookupParams)` | Retrieve a single GRU payment |
+
+Runnable example: [`examples/gru/main.go`](examples/gru/main.go)
 
 ---
 
@@ -580,6 +594,8 @@ A `401 Unauthorized` response causes the client to clear the cached token and re
 | `gps.go` | GPS (social security) endpoints |
 | `gru.go` | GRU (public sector) endpoints |
 | `doc.go` | Package-level documentation and constants |
+| `examples/` | Runnable sandbox and homologation programs for supported payment flows |
+| `.vscode/launch.json` | VS Code compound debug profile for running all examples together |
 
 ---
 
@@ -592,6 +608,18 @@ go test ./...
 ```
 
 The tests cover client initialization, token management, OAuth flows, request construction, model serialization, response parsing, error handling, retry behavior, and mTLS enforcement.
+
+To validate that all example programs build correctly, run:
+
+```bash
+go test ./examples/...
+```
+
+To execute a specific example directly:
+
+```bash
+go run ./examples/transfers
+```
 
 ---
 ## Contributing
