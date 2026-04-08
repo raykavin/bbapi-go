@@ -1,9 +1,11 @@
-package bbapi
+package batchpayments
 
 import (
 	"context"
 	"fmt"
 	"net/url"
+
+	"github.com/raykavin/bbapi-go"
 )
 
 const (
@@ -158,25 +160,41 @@ func (c *Client) CreateGRUBatch(
 	ctx context.Context,
 	req *CreateGRUBatchRequest,
 ) (*CreateGRUBatchResponse, error) {
-	return post[*CreateGRUBatchResponse](c, ctx, endpointGRUBatch, req)
+
+	return bbapi.Post[*CreateGRUBatchResponse](
+		ctx,
+		c.Client,
+		endpointGRUBatch,
+		req,
+	)
 }
 
 // GetGRUBatchRequest returns the request-stage representation of a GRU batch.
 func (c *Client) GetGRUBatchRequest(
 	ctx context.Context,
 	id string,
-	params *AccountLookupParams,
+	params *bbapi.AccountLookupParams,
 ) (*GetGRUBatchRequestResponse, error) {
-	if err := c.requireMTLS(); err != nil {
-		return nil, err
-	}
 
 	query := url.Values{}
-	setAccountLookupQuery(query, params, "numeroAgenciaDebito",
-		"numeroContaCorrenteDebito", "digitoVerificadorContaCorrenteDebito")
-	return get[*GetGRUBatchRequestResponse](
-		c, ctx,
-		buildPath(fmt.Sprintf(endpointGRUBatchRequest, id), query),
+
+	bbapi.SetAccountLookupQuery(
+		query,
+		params,
+		"numeroAgenciaDebito",
+		"numeroContaCorrenteDebito",
+		"digitoVerificadorContaCorrenteDebito",
+	)
+
+	path := bbapi.BuildPath(
+		fmt.Sprintf(endpointGRUBatchRequest, id),
+		query,
+	)
+
+	return bbapi.Get[*GetGRUBatchRequestResponse](
+		ctx,
+		c.Client,
+		path,
 	)
 }
 
@@ -184,17 +202,27 @@ func (c *Client) GetGRUBatchRequest(
 func (c *Client) GetGRUPayment(
 	ctx context.Context,
 	id string,
-	params *AccountLookupParams,
+	params *bbapi.AccountLookupParams,
 ) (*GetGRUPaymentResponse, error) {
-	if err := c.requireMTLS(); err != nil {
-		return nil, err
-	}
 
 	query := url.Values{}
-	setAccountLookupQuery(query, params,
-		"agencia", "contaCorrente", "digitoVerificador")
-	return get[*GetGRUPaymentResponse](
-		c, ctx,
-		buildPath(fmt.Sprintf(endpointGRUPayment, id), query),
+
+	bbapi.SetAccountLookupQuery(
+		query,
+		params,
+		"agencia",
+		"contaCorrente",
+		"digitoVerificador",
+	)
+
+	path := bbapi.BuildPath(
+		fmt.Sprintf(endpointGRUPayment, id),
+		query,
+	)
+
+	return bbapi.Get[*GetGRUPaymentResponse](
+		ctx,
+		c.Client,
+		path,
 	)
 }

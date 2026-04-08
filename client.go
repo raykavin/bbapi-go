@@ -74,11 +74,6 @@ func NewClient(cfg Config) (*Client, error) {
 	return c, nil
 }
 
-// New is a convenience alias for NewClient.
-func New(cfg Config) (*Client, error) {
-	return NewClient(cfg)
-}
-
 // SetAccessToken stores a raw access token with no expiry.
 func (c *Client) SetAccessToken(token string) {
 	c.tokenMu.Lock()
@@ -124,12 +119,12 @@ func (c *Client) TokenExpiresAt() time.Time {
 	return c.token.expiresAt
 }
 
-// requireMTLS returns ErrMTLSRequired if the client was not configured with
+// MTLSErr returns ErrMTLSRequired if the client was not configured with
 // mutual TLS and not in sandbox mode. Call this at the top of any method
 // that the BB API mandates a client certificate for.
-func (c *Client) requireMTLS() error {
+func (c *Client) MTLSErr(apiName string) error {
 	if !c.mtlsEnabled && !c.sandboxMode {
-		return ErrMTLSRequired
+		return fmt.Errorf("%s api require a mTLS authentication certificates", apiName)
 	}
 	return nil
 }
@@ -244,7 +239,11 @@ func (c *Client) do(
 	return responseBody, statusCode, callErr
 }
 
-func (c *Client) doJSON(ctx context.Context, method, rawURL string, body any) ([]byte, error) {
+func (c *Client) doJSON(
+	ctx context.Context,
+	method, rawURL string,
+	body any,
+) ([]byte, error) {
 	var (
 		payload     []byte
 		contentType string
@@ -263,7 +262,12 @@ func (c *Client) doJSON(ctx context.Context, method, rawURL string, body any) ([
 	return result, err
 }
 
-func (c *Client) doFormDirect(ctx context.Context, targetURL string, payload []byte, extraHeaders map[string]string) ([]byte, int, error) {
+func (c *Client) doFormDirect(
+	ctx context.Context,
+	targetURL string,
+	payload []byte,
+	extraHeaders map[string]string,
+) ([]byte, int, error) {
 	headers := gkhttp.DefaultFormHeaders()
 	headers.Set(gkhttp.HeaderUserAgent, userAgent)
 	for k, v := range extraHeaders {

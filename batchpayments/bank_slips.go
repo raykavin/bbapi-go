@@ -1,9 +1,11 @@
-package bbapi
+package batchpayments
 
 import (
 	"context"
 	"fmt"
 	"net/url"
+
+	"github.com/raykavin/bbapi-go"
 )
 
 // BankSlipEntry represents a bank-slip payment entry.
@@ -153,28 +155,40 @@ func (c *Client) CreateBankSlipBatch(
 	ctx context.Context,
 	req *CreateBankSlipBatchRequest,
 ) (*CreateBankSlipBatchResponse, error) {
-	if err := c.requireMTLS(); err != nil {
-		return nil, err
-	}
 
-	return post[*CreateBankSlipBatchResponse](c, ctx, endpointBankSlipBatch, req)
+	return bbapi.Post[*CreateBankSlipBatchResponse](
+		ctx,
+		c.Client,
+		endpointBankSlipBatch,
+		req,
+	)
 }
 
 // GetBankSlipBatchRequest returns the request-stage representation of a bank-slip batch.
 func (c *Client) GetBankSlipBatchRequest(
 	ctx context.Context,
 	id string,
-	params *AccountLookupParams,
+	params *bbapi.AccountLookupParams,
 ) (*GetBankSlipBatchRequestResponse, error) {
-	if err := c.requireMTLS(); err != nil {
-		return nil, err
-	}
-
 	query := url.Values{}
-	setAccountLookupQuery(query, params, "agencia", "contaCorrente", "digitoVerificador")
-	return get[*GetBankSlipBatchRequestResponse](
-		c, ctx,
-		buildPath(fmt.Sprintf(endpointBankSlipBatchRequest, id), query),
+
+	bbapi.SetAccountLookupQuery(
+		query,
+		params,
+		"agencia",
+		"contaCorrente",
+		"digitoVerificador",
+	)
+
+	path := bbapi.BuildPath(
+		fmt.Sprintf(endpointBankSlipBatchRequest, id),
+		query,
+	)
+
+	return bbapi.Get[*GetBankSlipBatchRequestResponse](
+		ctx,
+		c.Client,
+		path,
 	)
 }
 
@@ -182,16 +196,26 @@ func (c *Client) GetBankSlipBatchRequest(
 func (c *Client) GetBankSlipPayment(
 	ctx context.Context,
 	id string,
-	params *AccountLookupParams,
+	params *bbapi.AccountLookupParams,
 ) (*GetBankSlipPaymentResponse, error) {
-	if err := c.requireMTLS(); err != nil {
-		return nil, err
-	}
-
 	query := url.Values{}
-	setAccountLookupQuery(query, params, "agencia", "contaCorrente", "digitoVerificador")
-	return get[*GetBankSlipPaymentResponse](
-		c, ctx,
-		buildPath(fmt.Sprintf(endpointBankSlipPayment, id), query),
+
+	bbapi.SetAccountLookupQuery(
+		query,
+		params,
+		"agencia",
+		"contaCorrente",
+		"digitoVerificador",
+	)
+
+	path := bbapi.BuildPath(
+		fmt.Sprintf(endpointBankSlipPayment, id),
+		query,
+	)
+
+	return bbapi.Get[*GetBankSlipPaymentResponse](
+		ctx,
+		c.Client,
+		path,
 	)
 }

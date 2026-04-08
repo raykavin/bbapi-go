@@ -7,6 +7,7 @@ import (
 	"os"
 
 	bbapi "github.com/raykavin/bbapi-go"
+	"github.com/raykavin/bbapi-go/batchpayments"
 	"github.com/raykavin/bbapi-go/examples"
 )
 
@@ -21,7 +22,7 @@ import (
 //	4308     74.910.037/0001-93         17       10/2022    706.90                     706.90
 //	4308     98.959.112/0001-79         17       10/2022  1,443.75                   1,443.75
 func main() {
-	client, err := bbapi.NewClient(bbapi.Config{
+	bbClient, err := bbapi.NewClient(bbapi.Config{
 		ClientID:     os.Getenv("BB_CLIENT_ID"),
 		ClientSecret: os.Getenv("BB_CLIENT_SECRET"),
 		AppKey:       os.Getenv("BB_APP_KEY"),
@@ -37,15 +38,20 @@ func main() {
 		log.Fatalf("creating client: %v", err)
 	}
 
+	client, err := batchpayments.NewClient(bbClient)
+	if err != nil {
+		log.Fatalf("creating batch payments client: %v", err)
+	}
+
 	ctx := context.Background()
 	paymentDate := int64(1102026) // 01/10/2026 in ddmmaaaa numeric format.
 
-	batch, err := client.CreateGPSBatch(ctx, &bbapi.CreateGPSBatchRequest{
+	batch, err := client.CreateGPSBatch(ctx, &batchpayments.CreateGPSBatchRequest{
 		RequestNumber:          examples.RandomReqNumber(),
 		DebitAgencyNumber:      examples.Ptr[int64](1607),
 		DebitAccountNumber:     examples.Ptr[int64](99738672),
 		DebitAccountCheckDigit: examples.Ptr("X"),
-		Entries: []bbapi.GPSEntry{
+		Entries: []batchpayments.GPSEntry{
 			{
 				// Revenue 1007 | CPF 126.792.028-99 | id code 17 | period 10/2022
 				PaymentDate:            paymentDate,

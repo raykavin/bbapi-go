@@ -1,10 +1,12 @@
-package bbapi
+package batchpayments
 
 import (
 	"context"
 	"fmt"
 	"net/url"
 	"strconv"
+
+	"github.com/raykavin/bbapi-go"
 )
 
 const (
@@ -187,13 +189,31 @@ type BarcodePaymentsResponse struct {
 }
 
 // ReleasePayments releases a payment batch.
-func (c *Client) ReleasePayments(ctx context.Context, req *ReleasePaymentsRequest) (*ReleasePaymentsResponse, error) {
-	return post[*ReleasePaymentsResponse](c, ctx, endpointReleasePayments, req)
+func (c *Client) ReleasePayments(
+	ctx context.Context,
+	req *ReleasePaymentsRequest,
+) (*ReleasePaymentsResponse, error) {
+
+	return bbapi.Post[*ReleasePaymentsResponse](
+		ctx,
+		c.Client,
+		endpointReleasePayments,
+		req,
+	)
 }
 
 // CancelPayments requests payment cancellation.
-func (c *Client) CancelPayments(ctx context.Context, req *CancelPaymentsRequest) (*CancelPaymentsResponse, error) {
-	return post[*CancelPaymentsResponse](c, ctx, endpointCancelPayments, req)
+func (c *Client) CancelPayments(
+	ctx context.Context,
+	req *CancelPaymentsRequest,
+) (*CancelPaymentsResponse, error) {
+
+	return bbapi.Post[*CancelPaymentsResponse](
+		ctx,
+		c.Client,
+		endpointCancelPayments,
+		req,
+	)
 }
 
 // UpdatePaymentDates updates scheduled payment dates inside a batch.
@@ -202,7 +222,13 @@ func (c *Client) UpdatePaymentDates(
 	id string,
 	req *UpdatePaymentDatesRequest,
 ) (*UpdatePaymentDatesResponse, error) {
-	return put[*UpdatePaymentDatesResponse](c, ctx, fmt.Sprintf(endpointUpdateDates, id), req)
+
+	return bbapi.Put[*UpdatePaymentDatesResponse](
+		ctx,
+		c.Client,
+		fmt.Sprintf(endpointUpdateDates, id),
+		req,
+	)
 }
 
 // ListReturnedPayments lists returned or reversed payments.
@@ -210,18 +236,32 @@ func (c *Client) ListReturnedPayments(
 	ctx context.Context,
 	params *ListReturnedPaymentsParams,
 ) (*ListReturnedPaymentsResponse, error) {
+
 	query := url.Values{}
+
 	if params != nil {
-		setInt64(query, "agenciaDebito", params.DebitAgency)
-		setInt64(query, "contaCorrenteDebito", params.DebitAccount)
-		setString(query, "digitoVerificadorContaCorrente", params.DebitAccountCheckDigit)
-		setInt64(query, "numeroContratoPagamento", params.PaymentContractNumber)
+		bbapi.SetInt64(query, "agenciaDebito", params.DebitAgency)
+		bbapi.SetInt64(query, "contaCorrenteDebito", params.DebitAccount)
+		bbapi.SetString(query, "digitoVerificadorContaCorrente", params.DebitAccountCheckDigit)
+		bbapi.SetInt64(query, "numeroContratoPagamento", params.PaymentContractNumber)
+
 		query.Set("dataInicio", strconv.FormatInt(params.StartDate, 10))
 		query.Set("dataFim", strconv.FormatInt(params.EndDate, 10))
 		query.Set("indice", strconv.FormatInt(params.Index, 10))
-		setString(query, "estadoPagamento", params.PaymentState)
+
+		bbapi.SetString(query, "estadoPagamento", params.PaymentState)
 	}
-	return get[*ListReturnedPaymentsResponse](c, ctx, buildPath(endpointReturnedPayments, query))
+
+	path := bbapi.BuildPath(
+		endpointReturnedPayments,
+		query,
+	)
+
+	return bbapi.Get[*ListReturnedPaymentsResponse](
+		ctx,
+		c.Client,
+		path,
+	)
 }
 
 // ListPaymentEntries lists payment entries by period.
@@ -229,32 +269,61 @@ func (c *Client) ListPaymentEntries(
 	ctx context.Context,
 	params *ListPaymentEntriesParams,
 ) (*ListPaymentEntriesResponse, error) {
+
 	query := url.Values{}
+
 	if params != nil {
-		setInt64(query, "codigoClienteConveniado", params.ClientAgreementCode)
+		bbapi.SetInt64(query, "codigoClienteConveniado", params.ClientAgreementCode)
+
 		query.Set("numeroAgenciaDebito", strconv.FormatInt(params.DebitAgencyNumber, 10))
 		query.Set("numeroContaCorrenteDebito", strconv.FormatInt(params.DebitAccountNumber, 10))
 		query.Set("digitoVerificadorContaCorrenteDebito", params.DebitAccountCheckDigit)
+
 		query.Set("dataInicialdeEnviodaRequisicao", strconv.FormatInt(params.RequestSentStartDate, 10))
-		setInt64(query, "dataFinaldeEnviodaRequisicao", params.RequestSentEndDate)
-		setInt64(query, "codigodoEstadodoPagamento", params.PaymentStateCode)
-		setInt64(query, "codigoProduto", params.ProductCode)
-		setInt64(query, "numeroDaPosicaoDePesquisa", params.SearchPosition)
+
+		bbapi.SetInt64(query, "dataFinaldeEnviodaRequisicao", params.RequestSentEndDate)
+		bbapi.SetInt64(query, "codigodoEstadodoPagamento", params.PaymentStateCode)
+		bbapi.SetInt64(query, "codigoProduto", params.ProductCode)
+		bbapi.SetInt64(query, "numeroDaPosicaoDePesquisa", params.SearchPosition)
 	}
-	return get[*ListPaymentEntriesResponse](c, ctx, buildPath(endpointPaymentEntries, query))
+
+	path := bbapi.BuildPath(
+		endpointPaymentEntries,
+		query,
+	)
+
+	return bbapi.Get[*ListPaymentEntriesResponse](
+		ctx,
+		c.Client,
+		path,
+	)
 }
 
 // GetBarcodePayments returns payments linked to a barcode.
 func (c *Client) GetBarcodePayments(
 	ctx context.Context,
 	id string,
-	params *AccountLookupParams,
+	params *bbapi.AccountLookupParams,
 ) (*BarcodePaymentsResponse, error) {
-	if err := c.requireMTLS(); err != nil {
-		return nil, err
-	}
 
 	query := url.Values{}
-	setAccountLookupQuery(query, params, "agenciaDebito", "contaCorrenteDebito", "digitoVerificadorContaCorrente")
-	return get[*BarcodePaymentsResponse](c, ctx, buildPath(fmt.Sprintf(endpointBarcodePayments, id), query))
+
+	bbapi.SetAccountLookupQuery(
+		query,
+		params,
+		"agenciaDebito",
+		"contaCorrenteDebito",
+		"digitoVerificadorContaCorrente",
+	)
+
+	path := bbapi.BuildPath(
+		fmt.Sprintf(endpointBarcodePayments, id),
+		query,
+	)
+
+	return bbapi.Get[*BarcodePaymentsResponse](
+		ctx,
+		c.Client,
+		path,
+	)
 }

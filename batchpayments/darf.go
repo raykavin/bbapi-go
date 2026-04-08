@@ -1,9 +1,11 @@
-package bbapi
+package batchpayments
 
 import (
 	"context"
 	"fmt"
 	"net/url"
+
+	"github.com/raykavin/bbapi-go"
 )
 
 const (
@@ -158,10 +160,12 @@ func (c *Client) CreateDARFBatch(
 	ctx context.Context,
 	req *CreateDARFBatchRequest,
 ) (*CreateDARFBatchResponse, error) {
-	if err := c.requireMTLS(); err != nil {
-		return nil, err
-	}
-	return post[*CreateDARFBatchResponse](c, ctx, endpointDARFBatch, req)
+	return bbapi.Post[*CreateDARFBatchResponse](
+		ctx,
+		c.Client,
+		endpointDARFBatch,
+		req,
+	)
 }
 
 // GetDARFBatchRequest returns the request-stage representation of a DARF batch.
@@ -169,17 +173,28 @@ func (c *Client) CreateDARFBatch(
 func (c *Client) GetDARFBatchRequest(
 	ctx context.Context,
 	id string,
-	params *AccountLookupParams,
+	params *bbapi.AccountLookupParams,
 ) (*GetDARFBatchRequestResponse, error) {
-	if err := c.requireMTLS(); err != nil {
-		return nil, err
-	}
 
 	query := url.Values{}
-	setAccountLookupQuery(query, params, "numeroAgenciaDebito", "numeroContaCorrenteDebito", "digitoVerificadorContaCorrenteDebito")
-	return get[*GetDARFBatchRequestResponse](
-		c, ctx,
-		buildPath(fmt.Sprintf(endpointDARFBatchRequest, id), query),
+
+	bbapi.SetAccountLookupQuery(
+		query,
+		params,
+		"numeroAgenciaDebito",
+		"numeroContaCorrenteDebito",
+		"digitoVerificadorContaCorrenteDebito",
+	)
+
+	path := bbapi.BuildPath(
+		fmt.Sprintf(endpointDARFBatchRequest, id),
+		query,
+	)
+
+	return bbapi.Get[*GetDARFBatchRequestResponse](
+		ctx,
+		c.Client,
+		path,
 	)
 }
 
@@ -188,15 +203,27 @@ func (c *Client) GetDARFBatchRequest(
 func (c *Client) GetDARFPayment(
 	ctx context.Context,
 	id string,
-	params *AccountLookupParams,
+	params *bbapi.AccountLookupParams,
 ) (*GetDARFPaymentResponse, error) {
-	if err := c.requireMTLS(); err != nil {
-		return nil, err
-	}
+
 	query := url.Values{}
-	setAccountLookupQuery(query, params, "agencia", "contaCorrente", "digitoVerificador")
-	return get[*GetDARFPaymentResponse](
-		c, ctx,
-		buildPath(fmt.Sprintf(endpointDARFPayment, id), query),
+
+	bbapi.SetAccountLookupQuery(
+		query,
+		params,
+		"agencia",
+		"contaCorrente",
+		"digitoVerificador",
+	)
+
+	path := bbapi.BuildPath(
+		fmt.Sprintf(endpointDARFPayment, id),
+		query,
+	)
+
+	return bbapi.Get[*GetDARFPaymentResponse](
+		ctx,
+		c.Client,
+		path,
 	)
 }

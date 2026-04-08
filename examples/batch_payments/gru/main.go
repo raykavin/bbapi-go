@@ -7,6 +7,7 @@ import (
 	"os"
 
 	bbapi "github.com/raykavin/bbapi-go"
+	"github.com/raykavin/bbapi-go/batchpayments"
 	"github.com/raykavin/bbapi-go/examples"
 )
 
@@ -30,7 +31,7 @@ import (
 //	89970000000800000010109552316288320117811508 | ref. 50103006   | period 11/2022 | due 04/11/2022 | CPF 442.140.732-15 →  80.00
 //	89900000001200000010109552316288320117811755 | ref. 2016021990 | period 11/2022 | due 04/11/2022 | CPF 435.529.512-53 → 120.00
 func main() {
-	client, err := bbapi.NewClient(bbapi.Config{
+	bbClient, err := bbapi.NewClient(bbapi.Config{
 		ClientID:     os.Getenv("BB_CLIENT_ID"),
 		ClientSecret: os.Getenv("BB_CLIENT_SECRET"),
 		AppKey:       os.Getenv("BB_APP_KEY"),
@@ -47,16 +48,21 @@ func main() {
 		log.Fatalf("creating client: %v", err)
 	}
 
+	client, err := batchpayments.NewClient(bbClient)
+	if err != nil {
+		log.Fatalf("creating batch payments client: %v", err)
+	}
+
 	ctx := context.Background()
 	scheduledDate := int64(15042026) // 15/04/2026 in ddmmaaaa format.
 	gruDueDate := int64(4112022)     // 04/11/2022 in ddmmaaaa numeric format.
 
-	batch, err := client.CreateGRUBatch(ctx, &bbapi.CreateGRUBatchRequest{
+	batch, err := client.CreateGRUBatch(ctx, &batchpayments.CreateGRUBatchRequest{
 		RequestNumber:     examples.RandomReqNumber(),
 		Agency:            examples.Ptr[int64](1607),
 		Account:           examples.Ptr[int64](99738672),
 		AccountCheckDigit: examples.Ptr("X"),
-		Entries: []bbapi.GRUEntry{
+		Entries: []batchpayments.GRUEntry{
 			{
 				Barcode:      "85880000001380003631130002185001233122022557",
 				PaymentDate:  scheduledDate,

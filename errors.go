@@ -8,13 +8,6 @@ import (
 	"strings"
 )
 
-// ErrMTLSRequired is returned when a method that requires mutual TLS is called
-// but the client was not configured with a client certificate. Set
-// MTLSCertFile/MTLSKeyFile (or MTLSCertPEM/MTLSKeyPEM) in Config, or set
-// Config.MTLSEnabled = true if you are providing your own http.Client already
-// configured with a client certificate.
-var ErrMTLSRequired = errors.New("bbapi: this API requires mutual TLS (mTLS); configure MTLSCertFile/MTLSKeyFile or MTLSCertPEM/MTLSKeyPEM")
-
 // ErrorDetail represents a single error entry from the Banco do Brasil API.
 type ErrorDetail struct {
 	Codigo     string `json:"codigo"`
