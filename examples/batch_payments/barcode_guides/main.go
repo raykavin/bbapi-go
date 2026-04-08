@@ -7,6 +7,7 @@ import (
 	"os"
 
 	bbapi "github.com/raykavin/bbapi-go"
+	"github.com/raykavin/bbapi-go/batchpayments"
 	"github.com/raykavin/bbapi-go/examples"
 )
 
@@ -25,7 +26,7 @@ import (
 //	84870000000449901602022012514009408900826123 →  44.99
 //	85660000000876699122102222230173633469013581 →  87.66
 func main() {
-	client, err := bbapi.NewClient(bbapi.Config{
+	bbClient, err := bbapi.NewClient(bbapi.Config{
 		ClientID:     os.Getenv("BB_CLIENT_ID"),
 		ClientSecret: os.Getenv("BB_CLIENT_SECRET"),
 		AppKey:       os.Getenv("BB_APP_KEY"),
@@ -41,15 +42,20 @@ func main() {
 		log.Fatalf("creating client: %v", err)
 	}
 
+	client, err := batchpayments.NewClient(bbClient)
+	if err != nil {
+		log.Fatalf("creating batch payments client: %v", err)
+	}
+
 	ctx := context.Background()
 	scheduledDate := int64(15042026) // 15/04/2026 in ddmmaaaa format.
 
-	batch, err := client.CreateBarcodeGuideBatch(ctx, &bbapi.CreateBarcodeGuideBatchRequest{
+	batch, err := client.CreateBarcodeGuideBatch(ctx, &batchpayments.CreateBarcodeGuideBatchRequest{
 		RequestNumber:          examples.RandomReqNumber(),
 		DebitAgencyNumber:      examples.Ptr[int64](1607),
 		DebitAccountNumber:     examples.Ptr[int64](99738672),
 		DebitAccountCheckDigit: examples.Ptr("X"),
-		Entries: []bbapi.BarcodeGuideEntry{
+		Entries: []batchpayments.BarcodeGuideEntry{
 			{
 				Barcode:      "83630000000641400052836100812355200812351310",
 				PaymentDate:  scheduledDate,

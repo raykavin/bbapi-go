@@ -7,6 +7,7 @@ import (
 	"os"
 
 	bbapi "github.com/raykavin/bbapi-go"
+	"github.com/raykavin/bbapi-go/batchpayments"
 	"github.com/raykavin/bbapi-go/examples"
 )
 
@@ -32,7 +33,7 @@ import (
 //	CNPJ 97.678.083/0001-04 → branch 0551 / account 14.669-2
 //	CNPJ 93.809.477/0001-01 → branch 0551 / account 62.114-5
 func main() {
-	client, err := bbapi.NewClient(bbapi.Config{
+	bbClient, err := bbapi.NewClient(bbapi.Config{
 		ClientID:     os.Getenv("BB_CLIENT_ID"),
 		ClientSecret: os.Getenv("BB_CLIENT_SECRET"),
 		AppKey:       os.Getenv("BB_APP_KEY"),
@@ -48,18 +49,23 @@ func main() {
 		log.Fatalf("creating client: %v", err)
 	}
 
+	client, err := batchpayments.NewClient(bbClient)
+	if err != nil {
+		log.Fatalf("creating batch payments client: %v", err)
+	}
+
 	ctx := context.Background()
 	scheduledDate := int64(15042026) // 15/04/2026 in ddmmaaaa format.
 
 	// Salary batch (CPF only)
-	salaryBatch, err := client.CreateTransferBatch(ctx, &bbapi.CreateTransferBatchRequest{
+	salaryBatch, err := client.CreateTransferBatch(ctx, &batchpayments.CreateTransferBatchRequest{
 		RequestNumber:          examples.RandomReqNumber(),
 		PaymentContractNumber:  examples.Ptr[int64](731030),
 		DebitAgency:            examples.Ptr[int64](1607),
 		DebitAccount:           examples.Ptr[int64](99738672),
 		DebitAccountCheckDigit: examples.Ptr("X"),
 		PaymentType:            bbapi.PaymentTypeSalary,
-		Transfers: []bbapi.Transfer{
+		Transfers: []batchpayments.Transfer{
 			{
 				// CPF 993.919.161-80 → branch 0018 / account 3066-X
 				COMPENumber:             examples.Ptr[int64](1), // Banco do Brasil
@@ -128,14 +134,14 @@ func main() {
 	}
 
 	// Supplier batch (CNPJ)
-	supplierBatch, err := client.CreateTransferBatch(ctx, &bbapi.CreateTransferBatchRequest{
+	supplierBatch, err := client.CreateTransferBatch(ctx, &batchpayments.CreateTransferBatchRequest{
 		RequestNumber:          examples.RandomReqNumber(),
 		PaymentContractNumber:  examples.Ptr[int64](731030),
 		DebitAgency:            examples.Ptr[int64](1607),
 		DebitAccount:           examples.Ptr[int64](99738672),
 		DebitAccountCheckDigit: examples.Ptr("X"),
 		PaymentType:            bbapi.PaymentTypeSuppliers,
-		Transfers: []bbapi.Transfer{
+		Transfers: []batchpayments.Transfer{
 			{
 				// CNPJ 84.526.081/0001-58 → branch 0551 / account 60.840-8
 				COMPENumber:             examples.Ptr[int64](1),

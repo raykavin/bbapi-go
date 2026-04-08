@@ -7,6 +7,7 @@ import (
 	"os"
 
 	bbapi "github.com/raykavin/bbapi-go"
+	"github.com/raykavin/bbapi-go/batchpayments"
 	"github.com/raykavin/bbapi-go/examples"
 )
 
@@ -19,7 +20,7 @@ import (
 //	5952     26.707.621/0001-01         16       14/04/2026  112021     1,116.00     7.36           1,123.36   15/04/2026
 //	1708     93.809.477/0001-01         16       14/04/2026             300.00       1.98           301.98     15/04/2026
 func main() {
-	client, err := bbapi.NewClient(bbapi.Config{
+	bbClient, err := bbapi.NewClient(bbapi.Config{
 		ClientID:     os.Getenv("BB_CLIENT_ID"),
 		ClientSecret: os.Getenv("BB_CLIENT_SECRET"),
 		AppKey:       os.Getenv("BB_APP_KEY"),
@@ -35,16 +36,21 @@ func main() {
 		log.Fatalf("creating client: %v", err)
 	}
 
+	client, err := batchpayments.NewClient(bbClient)
+	if err != nil {
+		log.Fatalf("creating batch payments client: %v", err)
+	}
+
 	ctx := context.Background()
 	paymentDate := int64(15042026)    // 15/04/2026 in ddmmaaaa format.
 	assessmentDate := int64(14042026) // 14/04/2026 in ddmmaaaa format.
 
-	batch, err := client.CreateDARFBatch(ctx, &bbapi.CreateDARFBatchRequest{
+	batch, err := client.CreateDARFBatch(ctx, &batchpayments.CreateDARFBatchRequest{
 		RequestID:              examples.RandomReqNumber(),
 		DebitAgencyNumber:      examples.Ptr[int64](1607),
 		DebitAccountNumber:     examples.Ptr[int64](99738672),
 		DebitAccountCheckDigit: examples.Ptr("X"),
-		Entries: []bbapi.DARFEntry{
+		Entries: []batchpayments.DARFEntry{
 			{
 				// Revenue 6106 | CNPJ 75.224.842/0001-26 | id code 18
 				// Assessment 14/04/2026 | ref. 1 | principal 128.01 | total 128.01 | due 15/04/2026

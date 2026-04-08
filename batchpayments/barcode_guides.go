@@ -1,9 +1,11 @@
-package bbapi
+package batchpayments
 
 import (
 	"context"
 	"fmt"
 	"net/url"
+
+	"github.com/raykavin/bbapi-go"
 )
 
 const (
@@ -117,24 +119,39 @@ func (c *Client) CreateBarcodeGuideBatch(
 	ctx context.Context,
 	req *CreateBarcodeGuideBatchRequest,
 ) (*CreateBarcodeGuideBatchResponse, error) {
-	return post[*CreateBarcodeGuideBatchResponse](c, ctx, endpointBarcodeGuideBatch, req)
+	return bbapi.Post[*CreateBarcodeGuideBatchResponse](
+		ctx,
+		c.Client,
+		endpointBarcodeGuideBatch,
+		req,
+	)
 }
 
 // GetBarcodeGuideBatchRequest returns the request-stage representation of a barcode-guide batch.
 func (c *Client) GetBarcodeGuideBatchRequest(
 	ctx context.Context,
 	id string,
-	params *AccountLookupParams,
+	params *bbapi.AccountLookupParams,
 ) (*GetBarcodeGuideBatchRequestResponse, error) {
-	if err := c.requireMTLS(); err != nil {
-		return nil, err
-	}
-
 	query := url.Values{}
-	setAccountLookupQuery(query, params, "agencia", "contaCorrente", "digitoVerificador")
-	return get[*GetBarcodeGuideBatchRequestResponse](
-		c, ctx,
-		buildPath(fmt.Sprintf(endpointBarcodeGuideBatchRequest, id), query),
+
+	bbapi.SetAccountLookupQuery(
+		query,
+		params,
+		"agencia",
+		"contaCorrente",
+		"digitoVerificador",
+	)
+
+	path := bbapi.BuildPath(
+		fmt.Sprintf(endpointBarcodeGuideBatchRequest, id),
+		query,
+	)
+
+	return bbapi.Get[*GetBarcodeGuideBatchRequestResponse](
+		ctx,
+		c.Client,
+		path,
 	)
 }
 
@@ -142,16 +159,26 @@ func (c *Client) GetBarcodeGuideBatchRequest(
 func (c *Client) GetBarcodeGuidePayment(
 	ctx context.Context,
 	id string,
-	params *AccountLookupParams,
+	params *bbapi.AccountLookupParams,
 ) (*GetBarcodeGuidePaymentResponse, error) {
-	if err := c.requireMTLS(); err != nil {
-		return nil, err
-	}
-
 	query := url.Values{}
-	setAccountLookupQuery(query, params, "agencia", "contaCorrente", "digitoVerificador")
-	return get[*GetBarcodeGuidePaymentResponse](
-		c, ctx,
-		buildPath(fmt.Sprintf(endpointBarcodeGuidePayment, id), query),
+
+	bbapi.SetAccountLookupQuery(
+		query,
+		params,
+		"agencia",
+		"contaCorrente",
+		"digitoVerificador",
+	)
+
+	path := bbapi.BuildPath(
+		fmt.Sprintf(endpointBarcodeGuidePayment, id),
+		query,
+	)
+
+	return bbapi.Get[*GetBarcodeGuidePaymentResponse](
+		ctx,
+		c.Client,
+		path,
 	)
 }

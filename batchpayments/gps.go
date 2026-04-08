@@ -1,9 +1,11 @@
-package bbapi
+package batchpayments
 
 import (
 	"context"
 	"fmt"
 	"net/url"
+
+	"github.com/raykavin/bbapi-go"
 )
 
 const (
@@ -133,29 +135,41 @@ func (c *Client) CreateGPSBatch(
 	ctx context.Context,
 	req *CreateGPSBatchRequest,
 ) (*CreateGPSBatchResponse, error) {
-	if err := c.requireMTLS(); err != nil {
-		return nil, err
-	}
 
-	return post[*CreateGPSBatchResponse](c, ctx, endpointGPSBatch, req)
+	return bbapi.Post[*CreateGPSBatchResponse](
+		ctx,
+		c.Client,
+		endpointGPSBatch,
+		req,
+	)
 }
 
 // GetGPSBatchRequest returns the request-stage representation of a GPS batch.
 func (c *Client) GetGPSBatchRequest(
 	ctx context.Context,
 	id string,
-	params *AccountLookupParams,
+	params *bbapi.AccountLookupParams,
 ) (*GetGPSBatchRequestResponse, error) {
-	if err := c.requireMTLS(); err != nil {
-		return nil, err
-	}
 
 	query := url.Values{}
-	setAccountLookupQuery(query, params, "numeroAgenciaDebito",
-		"numeroContaCorrenteDebito", "digitoVerificadorContaCorrenteDebito")
-	return get[*GetGPSBatchRequestResponse](
-		c, ctx,
-		buildPath(fmt.Sprintf(endpointGPSBatchRequest, id), query),
+
+	bbapi.SetAccountLookupQuery(
+		query,
+		params,
+		"numeroAgenciaDebito",
+		"numeroContaCorrenteDebito",
+		"digitoVerificadorContaCorrenteDebito",
+	)
+
+	path := bbapi.BuildPath(
+		fmt.Sprintf(endpointGPSBatchRequest, id),
+		query,
+	)
+
+	return bbapi.Get[*GetGPSBatchRequestResponse](
+		ctx,
+		c.Client,
+		path,
 	)
 }
 
@@ -163,16 +177,27 @@ func (c *Client) GetGPSBatchRequest(
 func (c *Client) GetGPSPayment(
 	ctx context.Context,
 	id string,
-	params *AccountLookupParams,
+	params *bbapi.AccountLookupParams,
 ) (*GetGPSPaymentResponse, error) {
-	if err := c.requireMTLS(); err != nil {
-		return nil, err
-	}
 
 	query := url.Values{}
-	setAccountLookupQuery(query, params, "agencia", "contaCorrente", "digitoVerificador")
-	return get[*GetGPSPaymentResponse](
-		c, ctx,
-		buildPath(fmt.Sprintf(endpointGPSPayment, id), query),
+
+	bbapi.SetAccountLookupQuery(
+		query,
+		params,
+		"agencia",
+		"contaCorrente",
+		"digitoVerificador",
+	)
+
+	path := bbapi.BuildPath(
+		fmt.Sprintf(endpointGPSPayment, id),
+		query,
+	)
+
+	return bbapi.Get[*GetGPSPaymentResponse](
+		ctx,
+		c.Client,
+		path,
 	)
 }

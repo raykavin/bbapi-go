@@ -7,6 +7,7 @@ import (
 	"os"
 
 	bbapi "github.com/raykavin/bbapi-go"
+	"github.com/raykavin/bbapi-go/batchpayments"
 	"github.com/raykavin/bbapi-go/examples"
 )
 
@@ -27,7 +28,7 @@ import (
 //	Type 5 | COMPE 1 | account type 1 | branch 4267 | account 1704959-8 | CPF  287.792.958-27
 //	Type 5 | COMPE 1 | account type 1 | branch  551 | account   43814-6 | CNPJ 95.127.446/0001-98
 func main() {
-	client, err := bbapi.NewClient(bbapi.Config{
+	bbClient, err := bbapi.NewClient(bbapi.Config{
 		ClientID:     os.Getenv("BB_CLIENT_ID"),
 		ClientSecret: os.Getenv("BB_CLIENT_SECRET"),
 		AppKey:       os.Getenv("BB_APP_KEY"),
@@ -43,17 +44,22 @@ func main() {
 		log.Fatalf("creating client: %v", err)
 	}
 
+	client, err := batchpayments.NewClient(bbClient)
+	if err != nil {
+		log.Fatalf("creating batch payments client: %v", err)
+	}
+
 	ctx := context.Background()
 	scheduledDate := int64(15042026) // 15/04/2026 in ddmmaaaa format.
 
-	batch := &bbapi.CreatePixTransferBatchRequest{
+	batch := &batchpayments.CreatePixTransferBatchRequest{
 		RequestNumber:          examples.RandomReqNumber(),
 		ContractNumber:         examples.Ptr[int64](731030),
 		DebitAgency:            examples.Ptr[int64](1607),
 		DebitAccount:           examples.Ptr[int64](99738672),
 		DebitAccountCheckDigit: examples.Ptr("X"),
 		PaymentType:            bbapi.PaymentTypeSuppliers,
-		Transfers: []bbapi.PixTransfer{
+		Transfers: []batchpayments.PixTransfer{
 			{
 				// Type 1 (phone): (11) 985732102 → CNPJ 95.127.446/0001-98
 				Date:               scheduledDate,
@@ -128,13 +134,13 @@ func main() {
 	}
 
 	// Pix batch via account data (type 5)
-	accountBatch, err := client.CreatePixTransferBatch(ctx, &bbapi.CreatePixTransferBatchRequest{
+	accountBatch, err := client.CreatePixTransferBatch(ctx, &batchpayments.CreatePixTransferBatchRequest{
 		RequestNumber:          examples.RandomReqNumber(),
 		DebitAgency:            examples.Ptr[int64](1607),
 		DebitAccount:           examples.Ptr[int64](99738672),
 		DebitAccountCheckDigit: examples.Ptr("X"),
 		PaymentType:            bbapi.PaymentTypeMiscellaneous,
-		Transfers: []bbapi.PixTransfer{
+		Transfers: []batchpayments.PixTransfer{
 			{
 				// COMPE 1 | account type 1 | branch 4267 | account 1704959-8 | CPF 287.792.958-27
 				Date:               scheduledDate,

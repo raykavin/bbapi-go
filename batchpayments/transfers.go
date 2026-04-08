@@ -1,10 +1,12 @@
-package bbapi
+package batchpayments
 
 import (
 	"context"
 	"fmt"
 	"net/url"
 	"strconv"
+
+	"github.com/raykavin/bbapi-go"
 )
 
 const (
@@ -425,23 +427,27 @@ func (c *Client) ListTransferBatches(
 	ctx context.Context,
 	params *ListTransferBatchesParams,
 ) (*ListTransferBatchesResponse, error) {
-	if err := c.requireMTLS(); err != nil {
-		return nil, err
+	query := url.Values{}
+
+	if params != nil {
+		bbapi.SetInt64(query, "numeroContratoPagamento", params.PaymentContractNumber)
+		bbapi.SetInt64(query, "agenciaDebito", params.DebitAgency)
+		bbapi.SetInt64(query, "contaCorrenteDebito", params.DebitAccount)
+		bbapi.SetString(query, "digitoVerificadorContaCorrente", params.DebitAccountCheckDigit)
+		bbapi.SetInt64(query, "dataInicio", params.StartDate)
+		bbapi.SetInt64(query, "dataFim", params.EndDate)
+		bbapi.SetInt64(query, "tipoPagamento", params.PaymentType)
+		bbapi.SetInt64(query, "estadoRequisicao", params.RequestState)
+		bbapi.SetInt64(query, "indice", params.Index)
 	}
 
-	query := url.Values{}
-	if params != nil {
-		setInt64(query, "numeroContratoPagamento", params.PaymentContractNumber)
-		setInt64(query, "agenciaDebito", params.DebitAgency)
-		setInt64(query, "contaCorrenteDebito", params.DebitAccount)
-		setString(query, "digitoVerificadorContaCorrente", params.DebitAccountCheckDigit)
-		setInt64(query, "dataInicio", params.StartDate)
-		setInt64(query, "dataFim", params.EndDate)
-		setInt64(query, "tipoPagamento", params.PaymentType)
-		setInt64(query, "estadoRequisicao", params.RequestState)
-		setInt64(query, "indice", params.Index)
-	}
-	return get[*ListTransferBatchesResponse](c, ctx, buildPath(endpointTransferBatches, query))
+	path := bbapi.BuildPath(endpointTransferBatches, query)
+
+	return bbapi.Get[*ListTransferBatchesResponse](
+		ctx,
+		c.Client,
+		path,
+	)
 }
 
 // CreateTransferBatch creates a transfer batch.
@@ -449,47 +455,64 @@ func (c *Client) CreateTransferBatch(
 	ctx context.Context,
 	req *CreateTransferBatchRequest,
 ) (*CreateTransferBatchResponse, error) {
-	if err := c.requireMTLS(); err != nil {
-		return nil, err
-	}
-
-	return post[*CreateTransferBatchResponse](c, ctx, endpointTransferBatches, req)
+	return bbapi.Post[*CreateTransferBatchResponse](
+		ctx,
+		c.Client,
+		endpointTransferBatches,
+		req,
+	)
 }
 
 // GetTransferPayment returns a single transfer payment.
 func (c *Client) GetTransferPayment(
 	ctx context.Context,
 	id string,
-	params *AccountLookupParams,
+	params *bbapi.AccountLookupParams,
 ) (*GetTransferPaymentResponse, error) {
-	if err := c.requireMTLS(); err != nil {
-		return nil, err
-	}
-
 	query := url.Values{}
-	setAccountLookupQuery(query, params, "agencia", "contaCorrente", "digitoVerificador")
-	return get[*GetTransferPaymentResponse](
-		c, ctx,
-		buildPath(fmt.Sprintf(endpointTransferPayment, id), query),
+
+	bbapi.SetAccountLookupQuery(
+		query,
+		params,
+		"agencia",
+		"contaCorrente",
+		"digitoVerificador",
+	)
+
+	path := bbapi.BuildPath(
+		fmt.Sprintf(endpointTransferPayment, id),
+		query,
+	)
+
+	return bbapi.Get[*GetTransferPaymentResponse](
+		ctx,
+		c.Client,
+		path,
 	)
 }
 
 // GetBatchRequest returns the request-stage representation of a batch.
-func (c *Client) GetBatchRequest(ctx context.Context, id string) (*GetBatchRequestResponse, error) {
-	if err := c.requireMTLS(); err != nil {
-		return nil, err
-	}
-
-	return get[*GetBatchRequestResponse](c, ctx, fmt.Sprintf(endpointBatchRequest, id))
+func (c *Client) GetBatchRequest(
+	ctx context.Context,
+	id string,
+) (*GetBatchRequestResponse, error) {
+	return bbapi.Get[*GetBatchRequestResponse](
+		ctx,
+		c.Client,
+		fmt.Sprintf(endpointBatchRequest, id),
+	)
 }
 
 // GetBatch returns a payment batch by identifier.
-func (c *Client) GetBatch(ctx context.Context, id string) (*GetBatchResponse, error) {
-	if err := c.requireMTLS(); err != nil {
-		return nil, err
-	}
-
-	return get[*GetBatchResponse](c, ctx, fmt.Sprintf(endpointBatch, id))
+func (c *Client) GetBatch(
+	ctx context.Context,
+	id string,
+) (*GetBatchResponse, error) {
+	return bbapi.Get[*GetBatchResponse](
+		ctx,
+		c.Client,
+		fmt.Sprintf(endpointBatch, id),
+	)
 }
 
 // ListBeneficiaryTransfers lists transfers by beneficiary.
@@ -498,30 +521,35 @@ func (c *Client) ListBeneficiaryTransfers(
 	id string,
 	params *ListBeneficiaryTransfersParams,
 ) (*ListBeneficiaryTransfersResponse, error) {
-	if err := c.requireMTLS(); err != nil {
-		return nil, err
-	}
-
 	query := url.Values{}
+
 	if params != nil {
-		setInt64(query, "agenciaDebito", params.DebitAgency)
-		setInt64(query, "contaCorrenteDebito", params.DebitAccount)
-		setString(query, "digitoVerificadorContaCorrente", params.DebitAccountCheckDigit)
-		setInt64(query, "tipoPagamento", params.PaymentType)
-		setInt64(query, "numeroCOMPE", params.COMPENumber)
-		setInt64(query, "numeroISPB", params.ISPBNumber)
-		setInt64(query, "agenciaCredito", params.CreditAgency)
-		setInt64(query, "contaCorrenteCredito", params.CreditAccount)
-		setString(query, "digitoVerificadorContaCorrenteCredito", params.CreditAccountCheckDigit)
-		setString(query, "contaPagamentoCredito", params.CreditPaymentAccount)
+		bbapi.SetInt64(query, "agenciaDebito", params.DebitAgency)
+		bbapi.SetInt64(query, "contaCorrenteDebito", params.DebitAccount)
+		bbapi.SetString(query, "digitoVerificadorContaCorrente", params.DebitAccountCheckDigit)
+		bbapi.SetInt64(query, "tipoPagamento", params.PaymentType)
+		bbapi.SetInt64(query, "numeroCOMPE", params.COMPENumber)
+		bbapi.SetInt64(query, "numeroISPB", params.ISPBNumber)
+		bbapi.SetInt64(query, "agenciaCredito", params.CreditAgency)
+		bbapi.SetInt64(query, "contaCorrenteCredito", params.CreditAccount)
+		bbapi.SetString(query, "digitoVerificadorContaCorrenteCredito", params.CreditAccountCheckDigit)
+		bbapi.SetString(query, "contaPagamentoCredito", params.CreditPaymentAccount)
+
 		query.Set("dataInicio", strconv.FormatInt(params.StartDate, 10))
 		query.Set("dataFim", strconv.FormatInt(params.EndDate, 10))
 		query.Set("indice", strconv.FormatInt(params.Index, 10))
 		query.Set("tipoBeneficiario", strconv.FormatInt(params.BeneficiaryType, 10))
 	}
-	return get[*ListBeneficiaryTransfersResponse](
-		c, ctx,
-		buildPath(fmt.Sprintf(endpointBeneficiaryTransfers, id), query),
+
+	path := bbapi.BuildPath(
+		fmt.Sprintf(endpointBeneficiaryTransfers, id),
+		query,
+	)
+
+	return bbapi.Get[*ListBeneficiaryTransfersResponse](
+		ctx,
+		c.Client,
+		path,
 	)
 }
 
@@ -530,28 +558,39 @@ func (c *Client) CreatePixTransferBatch(
 	ctx context.Context,
 	req *CreatePixTransferBatchRequest,
 ) (*CreatePixTransferBatchResponse, error) {
-	if err := c.requireMTLS(); err != nil {
-		return nil, err
-	}
-
-	return post[*CreatePixTransferBatchResponse](c, ctx, endpointPixTransferBatches, req)
+	return bbapi.Post[*CreatePixTransferBatchResponse](
+		ctx,
+		c.Client,
+		endpointPixTransferBatches,
+		req,
+	)
 }
 
 // GetPixTransferBatchRequest returns the request-stage representation of a Pix batch.
 func (c *Client) GetPixTransferBatchRequest(
 	ctx context.Context,
 	id string,
-	params *AccountLookupParams,
+	params *bbapi.AccountLookupParams,
 ) (*GetPixTransferBatchRequestResponse, error) {
-	if err := c.requireMTLS(); err != nil {
-		return nil, err
-	}
-
 	query := url.Values{}
-	setAccountLookupQuery(query, params, "agencia", "contaCorrente", "digitoVerificador")
-	return get[*GetPixTransferBatchRequestResponse](
-		c, ctx,
-		buildPath(fmt.Sprintf(endpointPixTransferBatchRequest, id), query),
+
+	bbapi.SetAccountLookupQuery(
+		query,
+		params,
+		"agencia",
+		"contaCorrente",
+		"digitoVerificador",
+	)
+
+	path := bbapi.BuildPath(
+		fmt.Sprintf(endpointPixTransferBatchRequest, id),
+		query,
+	)
+
+	return bbapi.Get[*GetPixTransferBatchRequestResponse](
+		ctx,
+		c.Client,
+		path,
 	)
 }
 
@@ -561,19 +600,23 @@ func (c *Client) GetPixPayment(
 	id string,
 	params *GetPixPaymentParams,
 ) (*GetPixPaymentResponse, error) {
-	if err := c.requireMTLS(); err != nil {
-		return nil, err
+	query := url.Values{}
+
+	if params != nil {
+		bbapi.SetInt64(query, "agencia", params.Agency)
+		bbapi.SetInt64(query, "contaCorrente", params.Account)
+		bbapi.SetString(query, "digitoVerificador", params.CheckDigit)
+		bbapi.SetString(query, "camposExtras", params.ExtraFields)
 	}
 
-	query := url.Values{}
-	if params != nil {
-		setInt64(query, "agencia", params.Agency)
-		setInt64(query, "contaCorrente", params.Account)
-		setString(query, "digitoVerificador", params.CheckDigit)
-		setString(query, "camposExtras", params.ExtraFields)
-	}
-	return get[*GetPixPaymentResponse](
-		c, ctx,
-		buildPath(fmt.Sprintf(endpointPixPayment, id), query),
+	path := bbapi.BuildPath(
+		fmt.Sprintf(endpointPixPayment, id),
+		query,
+	)
+
+	return bbapi.Get[*GetPixPaymentResponse](
+		ctx,
+		c.Client,
+		path,
 	)
 }
