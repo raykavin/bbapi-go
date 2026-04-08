@@ -66,6 +66,15 @@ func Put[T any](ctx context.Context, c *Client, path string, body any) (T, error
 	return decode[T](raw)
 }
 
+func Patch[T any](ctx context.Context, c *Client, path string, body any) (T, error) {
+	raw, err := c.doJSON(ctx, http.MethodPatch, c.apiURL(path), body)
+	if err != nil {
+		var zero T
+		return zero, err
+	}
+	return decode[T](raw)
+}
+
 func decode[T any](data []byte) (T, error) {
 	var value T
 	if len(data) == 0 {
